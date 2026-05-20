@@ -8,7 +8,7 @@ class LoopMode(Enum):
     OFF = "off"
 
 
-class Mixer:
+class Queue:
     def __init__(self):
         self._queue: list[Track] = []
         self._background: list[Track] = []
@@ -48,6 +48,9 @@ class Mixer:
 
     def set_loop_mode(self, mode: LoopMode) -> None:
         self._loop_mode = mode
+
+    def remove_track(self, track: Track) -> None:
+        self._queue = [t for t in self._queue if t != track]
 
     @property
     def tracks(self) -> list[Track]:

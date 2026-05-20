@@ -44,3 +44,15 @@ class TestTrack:
         track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
         with pytest.raises((ValidationError)):
             track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"
+
+    def test_track_resolved_title_and_duration(self):
+        track = Track(
+            link="https://youtu.be/abc",
+            title="LOFI BEATS TO STUDY TO 1H",
+            duration=3600,
+            source=Source.YOUTUBE,
+            resolved=True,
+        )
+        assert track.title == "LOFI BEATS TO STUDY TO 1H"
+        assert track.duration == 3600
+        assert track.resolved is True

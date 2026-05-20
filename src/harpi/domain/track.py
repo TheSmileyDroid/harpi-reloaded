@@ -17,6 +17,13 @@ class Track(BaseModel):
     )
     link: str = Field(..., description="The link to the track.", frozen=True)
     source: Source = Field(..., description="The source of the track.", frozen=True)
+    title: str | None = Field(None, description="The title of the track.")
+    duration: int | None = Field(
+        None, description="The duration of the track in seconds."
+    )
+    resolved: bool = Field(
+        False, description="Whether the track's info have been resolved."
+    )
 
     @computed_field
     @cached_property
