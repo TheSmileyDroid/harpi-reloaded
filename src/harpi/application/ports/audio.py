@@ -1,0 +1,19 @@
+from harpi.domain.track import Track
+from typing import Protocol
+
+
+class AudioResolverProtocol(Protocol):
+    async def resolve(self, link: str) -> Track: ...
+
+
+class AudioPlayerProtocol(Protocol):
+    background_tracks: list[Track]
+    is_paused: bool = False
+    is_stopped: bool = False
+
+    @property
+    def playing(self) -> Track | None: ...
+    def play(self, track: Track) -> None: ...
+    def pause(self) -> None: ...
+    def resume(self) -> None: ...
+    def stop(self) -> None: ...

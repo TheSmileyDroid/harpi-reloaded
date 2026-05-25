@@ -68,6 +68,12 @@ class TestQueue:
         queue.clear_background_tracks()
         assert len(queue.background_tracks) == 0
 
+    def test_default_background_tracks_is_empty(self, queue: Queue):
+        assert len(queue.background_tracks) == 0
+
+    def test_default_loop_mode_is_off(self, queue: Queue):
+        assert queue.loop_mode == LoopMode.OFF
+
     def test_get_current_track_empty_queue(self, queue: Queue):
         assert queue.get_current_track() is None
 
@@ -103,6 +109,54 @@ class TestQueue:
         assert queue.get_current_track() is track2
         assert queue.skip_track() is track2
         assert queue.get_current_track() is None
+
+    def test_skip_track_single_off(self, queue: Queue, track1: Track):
+        queue.add_track(track1)
+        assert queue.skip_track() is track1
+        assert queue.get_current_track() is None
+
+    def test_skip_track_queue_exhausted(self, queue: Queue, track1: Track):
+        queue.add_track(track1)
+        queue.skip_track()
+        assert queue.skip_track() is None
+
+    def test_loop_queue_skips_single(self, queue: Queue, track1: Track):
+        queue.set_loop_mode(LoopMode.QUEUE)
+        queue.add_track(track1)
+        assert queue.skip_track() is track1
+        assert queue.get_current_track() is track1
+
+    def test_remove_track_first(
+        self, queue: Queue, track1: Track, track2: Track, track3: Track
+    ):
+        queue.add_track([track1, track2, track3])
+        queue.remove_track(track1)
+        assert len(queue.tracks) == 2
+        assert queue.tracks[0] == track2
+
+    def test_remove_track_last(
+        self, queue: Queue, track1: Track, track2: Track, track3: Track
+    ):
+        queue.add_track([track1, track2, track3])
+        queue.remove_track(track3)
+        assert len(queue.tracks) == 2
+        assert queue.tracks[-1] == track2
+
+    def test_remove_track_non_existent(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
+        queue.add_track(track1)
+        queue.remove_track(track2)
+        assert len(queue.tracks) == 1
+        assert queue.tracks[0] is track1
+
+    def test_remove_track_empty_queue(self, queue: Queue, track1: Track):
+        queue.remove_track(track1)
+        assert len(queue.tracks) == 0
+
+    def test_add_track_empty_list(self, queue: Queue):
+        queue.add_track([])
+        assert len(queue.tracks) == 0
 
     def test_remove_track(
         self, queue: Queue, track1: Track, track2: Track, track3: Track

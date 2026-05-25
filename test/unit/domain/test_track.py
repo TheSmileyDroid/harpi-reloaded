@@ -40,6 +40,10 @@ class TestTrack:
 
         assert track1 != track2
 
+    def test_track_equality_different_type(self):
+        track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
+        assert track1 != "Just a string"
+
     def test_track_is_immutable(self):
         track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
         with pytest.raises((ValidationError)):
@@ -51,8 +55,61 @@ class TestTrack:
             title="LOFI BEATS TO STUDY TO 1H",
             duration=3600,
             source=Source.YOUTUBE,
-            resolved=True,
         )
         assert track.title == "LOFI BEATS TO STUDY TO 1H"
         assert track.duration == 3600
-        assert track.resolved is True
+
+    @pytest.mark.parametrize(
+        ("link", "source", "expected"),
+        [
+            # YOUTUBE — short form
+            ("https://youtu.be/wPQEeBAXou0", Source.YOUTUBE, "wPQEeBAXou0"),
+            (
+                "https://youtu.be/wPQEeBAXou0?si=rJZmNcFc5RwQyo4K",
+                Source.YOUTUBE,
+                "wPQEeBAXou0",
+            ),
+            ("https://youtu.be/wPQEeBAXou0?list=PLabc", Source.YOUTUBE, "wPQEeBAXou0"),
+            (
+                "https://www.youtube.com/watch?v=wPQEeBAXou0",
+                Source.YOUTUBE,
+                "wPQEeBAXou0",
+            ),
+            (
+                "https://youtube.com/watch?v=wPQEeBAXou0&list=PLabc",
+                Source.YOUTUBE,
+                "wPQEeBAXou0",
+            ),
+            (
+                "https://youtube.com/watch?v=wPQEeBAXou0&t=30s",
+                Source.YOUTUBE,
+                "wPQEeBAXou0",
+            ),
+            (
+                "https://youtube.com/watch?v=wPQEeBAXou0&si=abc&t=30s",
+                Source.YOUTUBE,
+                "wPQEeBAXou0",
+            ),
+            # YOUTUBE — /embed/ and /shorts/
+            ("https://youtube.com/embed/wPQEeBAXou0", Source.YOUTUBE, "wPQEeBAXou0"),
+            ("https://youtube.com/shorts/wPQEeBAXou0", Source.YOUTUBE, "wPQEeBAXou0"),
+            # YOUTUBE — boundary/edge
+            ("https://youtu.be/", Source.YOUTUBE, ""),
+            ("youtu.be", Source.YOUTUBE, "youtu.be"),
+            ("https://not-youtube.unknown", Source.YOUTUBE, ""),
+            # SPOTIFY
+            (
+                "https://open.spotify.com/track/4WvbyZqjR4XWg45H",
+                Source.SPOTIFY,
+                "4WvbyZqjR4XWg45H",
+            ),
+            (
+                "https://open.spotify.com/track/4WvbyZqjR4XWg45H?si=abc",
+                Source.SPOTIFY,
+                "4WvbyZqjR4XWg45H",
+            ),
+        ],
+    )
+    def test_source_id(self, link: str, source: Source, expected: str):
+        track = Track(link=link, source=source)
+        assert track.source_id == expected

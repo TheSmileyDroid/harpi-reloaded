@@ -1,3 +1,4 @@
+from typing import override
 from uuid import UUID
 from uuid import uuid4
 from functools import cached_property
@@ -22,7 +23,8 @@ class Track(BaseModel):
         None, description="The duration of the track in seconds."
     )
     resolved: bool = Field(
-        False, description="Whether the track's info have been resolved."
+        default_factory=lambda: False,
+        description="Whether the track's info have been resolved.",
     )
 
     @computed_field
@@ -33,12 +35,15 @@ class Track(BaseModel):
             if "youtu.be" in self.link:
                 return self.link.split("/")[-1].split("?")[0]
             elif "youtube.com" in self.link:
-                return self.link.split("v=")[-1].split("&")[0]
+                if "v=" in self.link:
+                    return self.link.split("v=")[-1].split("&")[0]
+                return self.link.split("/")[-1].split("?")[0]
         elif self.source == Source.SPOTIFY:
             return self.link.split("/")[-1].split("?")[0]
         return ""
 
-    def __eq__(self, other):
+    @override
+    def __eq__(self, other: object):
         if not isinstance(other, Track):
             return NotImplemented
         return self.source_id == other.source_id and self.source == other.source

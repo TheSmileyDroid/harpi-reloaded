@@ -46,6 +46,10 @@ class Queue:
             return track
         return None
 
+    @property
+    def loop_mode(self) -> LoopMode:
+        return self._loop_mode
+
     def set_loop_mode(self, mode: LoopMode) -> None:
         self._loop_mode = mode
 
@@ -59,3 +63,6 @@ class Queue:
     @property
     def background_tracks(self) -> list[Track]:
         return list(self._background)
+
+    def clear(self) -> None:
+        self._queue.clear()
