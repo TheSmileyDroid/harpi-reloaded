@@ -25,17 +25,17 @@ class FakePlayer(AudioPlayerProtocol):
     def playing(self):
         return self._playing
 
-    async def play(self, track: Track):
+    def play(self, track: Track):
         self._playing = track
         self.is_stopped = False
 
-    async def pause(self):
+    def pause(self):
         self.is_paused = True
 
-    async def resume(self):
+    def resume(self):
         self.is_paused = False
 
-    async def stop(self):
+    def stop(self):
         self._playing = None
         self.is_stopped = True
 
@@ -67,4 +67,24 @@ def track2():
         title="ANOTHER LOFI BEAT",
         duration=1800,
         source=Source.YOUTUBE,
+    )
+
+
+@pytest.fixture()
+def track3():
+    return Track(
+        link="https://youtu.be/ghi",
+        title="THIRD TRACK",
+        duration=900,
+        source=Source.YOUTUBE,
+    )
+
+
+@pytest.fixture()
+def spotify_track():
+    return Track(
+        link="https://open.spotify.com/track/4WvbyZqjR4XWg45H",
+        title="Spotify Track",
+        duration=240,
+        source=Source.SPOTIFY,
     )

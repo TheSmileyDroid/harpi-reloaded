@@ -5,7 +5,7 @@ import pytest
 from harpi.domain.track import Track, Source
 
 
-class TestTrack:
+class TestTrackCreation:
     def test_track_added_with_required_fields(self):
         track = Track(
             source=Source.YOUTUBE,
@@ -15,6 +15,33 @@ class TestTrack:
         assert track.source == Source.YOUTUBE
         assert type(track.id) is UUID
 
+    def test_track_resolved_title_and_duration(self):
+        track = Track(
+            link="https://youtu.be/abc",
+            title="LOFI BEATS TO STUDY TO 1H",
+            duration=3600,
+            source=Source.YOUTUBE,
+        )
+        assert track.title == "LOFI BEATS TO STUDY TO 1H"
+        assert track.duration == 3600
+
+    def test_track_missing_link_raises(self):
+        with pytest.raises(ValidationError):
+            Track(source=Source.YOUTUBE)
+
+    def test_track_missing_source_raises(self):
+        with pytest.raises(ValidationError):
+            Track(link="https://youtu.be/abc")
+
+
+class TestTrackImmutability:
+    def test_track_is_immutable(self):
+        track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
+        with pytest.raises((ValidationError)):
+            track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"
+
+
+class TestTrackEquality:
     def test_track_equality(self):
         track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
         track2 = Track(
@@ -35,30 +62,15 @@ class TestTrack:
 
     def test_track_equality_different_source_ids(self):
         track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-
         track2 = Track(source=Source.YOUTUBE, link="https://youtu.be/25Duje_sZko8")
-
         assert track1 != track2
 
     def test_track_equality_different_type(self):
         track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
         assert track1 != "Just a string"
 
-    def test_track_is_immutable(self):
-        track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        with pytest.raises((ValidationError)):
-            track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"
 
-    def test_track_resolved_title_and_duration(self):
-        track = Track(
-            link="https://youtu.be/abc",
-            title="LOFI BEATS TO STUDY TO 1H",
-            duration=3600,
-            source=Source.YOUTUBE,
-        )
-        assert track.title == "LOFI BEATS TO STUDY TO 1H"
-        assert track.duration == 3600
-
+class TestSourceId:
     @pytest.mark.parametrize(
         ("link", "source", "expected"),
         [
@@ -108,6 +120,13 @@ class TestTrack:
                 Source.SPOTIFY,
                 "4WvbyZqjR4XWg45H",
             ),
+            # BVA: empty link
+            ("", Source.YOUTUBE, ""),
+            ("", Source.SPOTIFY, ""),
+            # BVA: link with only query params (youtu.be doesn't parse v= param)
+            ("https://youtu.be/?v=abc", Source.YOUTUBE, ""),
+            # BVA: spotify with no track segment
+            ("https://open.spotify.com/", Source.SPOTIFY, ""),
         ],
     )
     def test_source_id(self, link: str, source: Source, expected: str):
