@@ -1,9 +1,8 @@
+from test.unit.conftest import FakeResolver, FakePlayer
 import pytest
 
 from harpi.application.commands.play import PlayCommand, PlayCommandHandler
 from harpi.application.player_service import PlayerService
-
-from test.unit.application.test_player_service import FakePlayer, FakeResolver
 
 
 @pytest.mark.asyncio

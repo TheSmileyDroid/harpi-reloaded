@@ -166,3 +166,19 @@ class TestQueue:
         assert len(queue.tracks) == 2
         assert queue.tracks[0] == track1
         assert queue.tracks[1] == track3
+
+    def test_queue_preserves_order_after_multiple_adds(self):
+        queue = Queue()
+        tracks = [
+            Track(link=f"l{i}", title=f"t{i}", duration=60, source=Source.YOUTUBE)
+            for i in range(5)
+        ]
+        queue.add_track(tracks)
+        assert queue.tracks == tracks  # state check
+        assert queue.get_current_track() == tracks[0]
+
+    def test_queue_isolation_between_instances(self):
+        q1, q2 = Queue(), Queue()
+        t1 = Track(link="a", title="A", duration=60, source=Source.YOUTUBE)
+        q1.add_track([t1])
+        assert q2.get_current_track() is None

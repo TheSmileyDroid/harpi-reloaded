@@ -1,68 +1,8 @@
-from harpi.application.ports.audio import AudioPlayerProtocol
-from harpi.application.ports.audio import AudioResolverProtocol
+from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.domain.queue import LoopMode
-from harpi.domain.track import Source
 from harpi.application.player_service import PlayerService
 import pytest
 from harpi.domain.track import Track
-
-
-class FakeResolver(AudioResolverProtocol):
-    async def resolve(self, link: str) -> Track:
-        return Track(
-            link=link,
-            title="LOFI BEATS TO STUDY TO 1H",
-            duration=3600,
-            source=Source.YOUTUBE,
-            resolved=True,
-        )
-
-
-class FakePlayer(AudioPlayerProtocol):
-    def __init__(self):
-        self._playing = None
-        self.background_tracks = []
-        self.is_paused = False
-        self.is_stopped = False
-
-    @property
-    def playing(self):
-        return self._playing
-
-    def play(self, track: Track):
-        self._playing = track
-        self.is_stopped = False
-        self.is_paused = False
-
-    def pause(self) -> None:
-        self.is_paused = True
-
-    def resume(self) -> None:
-        self.is_paused = False
-
-    def stop(self) -> None:
-        self._playing = None
-        self.is_stopped = True
-
-
-@pytest.fixture()
-def track1():
-    return Track(
-        link="https://youtu.be/abc",
-        title="LOFI BEATS TO STUDY TO 1H",
-        duration=3600,
-        source=Source.YOUTUBE,
-    )
-
-
-@pytest.fixture()
-def track2():
-    return Track(
-        link="https://youtu.be/def",
-        title="ANOTHER LOFI BEAT",
-        duration=1800,
-        source=Source.YOUTUBE,
-    )
 
 
 class TestPlayer:
