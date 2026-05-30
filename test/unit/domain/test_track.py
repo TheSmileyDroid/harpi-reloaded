@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import ValidationError
+from dataclasses import FrozenInstanceError
 import pytest
 
 from harpi.domain.track import Track, Source
@@ -26,19 +26,19 @@ class TestTrackCreation:
         assert track.duration == 3600
 
     def test_track_missing_link_raises(self):
-        with pytest.raises(ValidationError):
-            Track(source=Source.YOUTUBE)
+        with pytest.raises(TypeError):
+            Track(source=Source.YOUTUBE)  # ty:ignore[missing-argument]
 
     def test_track_missing_source_raises(self):
-        with pytest.raises(ValidationError):
-            Track(link="https://youtu.be/abc")
+        with pytest.raises(TypeError):
+            Track(link="https://youtu.be/abc")  # ty:ignore[missing-argument]
 
 
 class TestTrackImmutability:
     def test_track_is_immutable(self):
         track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        with pytest.raises((ValidationError)):
-            track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"
+        with pytest.raises(FrozenInstanceError):
+            track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"  # ty:ignore[invalid-assignment]
 
 
 class TestTrackEquality:

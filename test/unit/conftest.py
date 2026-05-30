@@ -28,6 +28,7 @@ class FakePlayer(AudioPlayerProtocol):
     def play(self, track: Track):
         self._playing = track
         self.is_stopped = False
+        self.is_paused = False
 
     def pause(self):
         self.is_paused = True

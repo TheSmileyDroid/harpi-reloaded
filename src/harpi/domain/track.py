@@ -1,10 +1,9 @@
-from typing import override
 from uuid import UUID
 from uuid import uuid4
 from functools import cached_property
+from dataclasses import dataclass, field
 
 from enum import Enum
-from pydantic import BaseModel, Field, computed_field
 
 
 class Source(Enum):
@@ -12,22 +11,15 @@ class Source(Enum):
     SPOTIFY = "spotify"
 
 
-class Track(BaseModel):
-    id: UUID = Field(
-        default_factory=uuid4, description="The unique identifier for the track."
-    )
-    link: str = Field(..., description="The link to the track.", frozen=True)
-    source: Source = Field(..., description="The source of the track.", frozen=True)
-    title: str | None = Field(None, description="The title of the track.")
-    duration: int | None = Field(
-        None, description="The duration of the track in seconds."
-    )
-    resolved: bool = Field(
-        default_factory=lambda: False,
-        description="Whether the track's info have been resolved.",
-    )
+@dataclass(frozen=True, eq=False)
+class Track:
+    link: str
+    source: Source
+    id: UUID = field(default_factory=uuid4)
+    title: str | None = None
+    duration: int | None = None
+    resolved: bool = False
 
-    @computed_field
     @cached_property
     def source_id(self) -> str:
         """Extract the source ID from the link."""
@@ -42,8 +34,10 @@ class Track(BaseModel):
             return self.link.split("/")[-1].split("?")[0]
         return ""
 
-    @override
-    def __eq__(self, other: object):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Track):
             return NotImplemented
         return self.source_id == other.source_id and self.source == other.source
+
+    def __hash__(self) -> int:
+        return hash((self.source_id, self.source))
