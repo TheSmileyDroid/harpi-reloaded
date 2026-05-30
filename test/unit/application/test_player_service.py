@@ -1,6 +1,7 @@
 from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.domain.queue import LoopMode
 from harpi.application.player_service import PlayerService
+from harpi.application.exceptions import InvalidLinkError, NetworkError, TimeoutError
 import pytest
 from harpi.domain.track import Track
 
@@ -227,3 +228,44 @@ class TestPlayerServiceOnTrackEnd:
         assert svc.queue.get_current_track() is None
         assert player.playing is not None
         assert player.playing.link == "https://youtu.be/b"
+
+
+class TestPlayerServiceWithFailingResolver:
+    @pytest.mark.asyncio
+    async def test_play_invalid_link_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad link"))
+
+        with pytest.raises(InvalidLinkError):
+            await svc.play("https://youtu.be/bad")
+
+        assert len(svc.queue.tracks) == 0
+        assert player.playing is None
+
+    @pytest.mark.asyncio
+    async def test_play_timeout_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        resolver.set_failure("https://youtu.be/slow", TimeoutError("Timed out"))
+
+        with pytest.raises(TimeoutError):
+            await svc.play("https://youtu.be/slow")
+
+        assert len(svc.queue.tracks) == 0
+        assert player.playing is None
+
+    @pytest.mark.asyncio
+    async def test_play_network_error_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        resolver.set_failure("https://youtu.be/down", NetworkError("Network down"))
+
+        with pytest.raises(NetworkError):
+            await svc.play("https://youtu.be/down")
+
+        assert len(svc.queue.tracks) == 0
+        assert player.playing is None

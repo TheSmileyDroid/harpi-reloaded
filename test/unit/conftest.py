@@ -4,7 +4,15 @@ from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProt
 
 
 class FakeResolver(AudioResolverProtocol):
+    def __init__(self):
+        self._failures: dict[str, Exception] = {}
+
+    def set_failure(self, link: str, exc: Exception) -> None:
+        self._failures[link] = exc
+
     async def resolve(self, link: str) -> Track:
+        if link in self._failures:
+            raise self._failures[link]
         return Track(
             link=link,
             title="Fake Track",

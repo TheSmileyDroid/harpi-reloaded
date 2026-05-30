@@ -1,5 +1,6 @@
 import pytest
 from harpi.domain.track import Source
+from harpi.application.exceptions import InvalidLinkError
 
 
 @pytest.mark.integration
@@ -38,7 +39,7 @@ class TestYoutubeResolver:
         from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
         resolver = YoutubeResolver()
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidLinkError):
             await resolver.resolve("https://youtu.be/ID_INVALIDO_12345")
 
     @pytest.mark.asyncio
@@ -46,7 +47,7 @@ class TestYoutubeResolver:
         from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
         resolver = YoutubeResolver()
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidLinkError):
             await resolver.resolve("https://example.com/not-a-video")
 
     @pytest.mark.asyncio
@@ -54,5 +55,5 @@ class TestYoutubeResolver:
         from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
         resolver = YoutubeResolver()
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidLinkError):
             await resolver.resolve("")
