@@ -11,11 +11,11 @@ class TestYoutubeResolver:
         from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
         resolver = YoutubeResolver()
-        track = await resolver.resolve("https://youtu.be/jNQXAC9IVRw")
+        track = await resolver.resolve("https://youtu.be/M8J9zHyyUYc")
 
-        assert track.link == "https://youtube.com/watch?v=jNQXAC9IVRw"
+        assert track.link == "https://youtube.com/watch?v=M8J9zHyyUYc"
         assert track.source == Source.YOUTUBE
-        assert track.source_id == "jNQXAC9IVRw"
+        assert track.source_id == "M8J9zHyyUYc"
         assert track.title is not None
         assert len(track.title) > 0
         assert track.duration is not None
@@ -27,9 +27,9 @@ class TestYoutubeResolver:
         from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
         resolver = YoutubeResolver()
-        track = await resolver.resolve("https://www.youtube.com/watch?v=jNQXAC9IVRw")
+        track = await resolver.resolve("https://www.youtube.com/watch?v=M8J9zHyyUYc")
 
-        assert track.source_id == "jNQXAC9IVRw"
+        assert track.source_id == "M8J9zHyyUYc"
         assert track.title is not None
         assert track.duration is not None
 

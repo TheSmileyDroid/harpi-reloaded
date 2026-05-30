@@ -28,13 +28,13 @@ class TestPlayerServiceWithRealResolver:
         from test.unit.conftest import FakePlayer
 
         svc = PlayerService(resolver=YoutubeResolver(), player=FakePlayer())
-        await svc.play("https://youtu.be/jNQXAC9IVRw")
+        await svc.play("https://youtu.be/M8J9zHyyUYc")
         await svc.play("https://youtu.be/dQw4w9WgXcQ")
 
         assert len(svc.queue.tracks) == 2
         first = svc.queue.get_current_track()
         assert first is not None
-        assert first.source_id == "jNQXAC9IVRw"
+        assert first.source_id == "M8J9zHyyUYc"
 
         svc.skip()
         assert len(svc.queue.tracks) == 1
@@ -48,7 +48,7 @@ class TestPlayerServiceWithRealResolver:
         from test.unit.conftest import FakePlayer
 
         svc = PlayerService(resolver=YoutubeResolver(), player=FakePlayer())
-        await svc.play("https://youtu.be/jNQXAC9IVRw")
+        await svc.play("https://youtu.be/M8J9zHyyUYc")
         assert len(svc.queue.tracks) == 1
 
         svc.stop()
@@ -61,7 +61,7 @@ class TestPlayerServiceWithRealResolver:
 
         svc = PlayerService(resolver=YoutubeResolver(), player=FakePlayer())
         svc.queue.set_loop_mode(LoopMode.QUEUE)
-        await svc.play("https://youtu.be/jNQXAC9IVRw")
+        await svc.play("https://youtu.be/M8J9zHyyUYc")
         await svc.play("https://youtu.be/dQw4w9WgXcQ")
 
         svc.skip()

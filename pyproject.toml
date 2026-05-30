@@ -18,7 +18,9 @@ dependencies = [
 
 
 [tool.pytest.ini_options]
-markers = ["integration: requires network (deselect with -m 'not integration')"]
+markers = ["integration: requires network (deselect with '-m not integration')"]
+asyncio_mode = "auto"
+asyncio_default_test_loop_scope = "session"
 addopts = [
     "--import-mode=importlib",
     "--cov=harpi",
