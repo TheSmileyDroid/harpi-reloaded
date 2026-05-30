@@ -47,7 +47,9 @@ class TestQueueAddTrack:
         queue.add_track([])
         assert len(queue.tracks) == 0
 
-    def test_add_track_interleaved_with_skip(self, queue: Queue, track1: Track, track2: Track):
+    def test_add_track_interleaved_with_skip(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
         queue.add_track(track1)
         queue.skip_track()
         queue.add_track(track2)
@@ -107,6 +109,10 @@ class TestQueueBackgroundTracks:
         queue.set_background_tracks([track2, track3])
         assert len(queue.background_tracks) == 2
         assert queue.background_tracks[0] == track2
+
+    def test_background_starts_empty(self, queue: Queue):
+        assert len(queue.background_tracks) == 0
+        assert queue.background_tracks == []
 
 
 class TestQueueDefensiveCopy:
@@ -184,7 +190,9 @@ class TestQueueLoopQueue:
         queue.set_loop_mode(LoopMode.QUEUE)
         assert queue.skip_track() is None
 
-    def test_loop_queue_full_rotation(self, queue: Queue, track1: Track, track2: Track, track3: Track):
+    def test_loop_queue_full_rotation(
+        self, queue: Queue, track1: Track, track2: Track, track3: Track
+    ):
         queue.set_loop_mode(LoopMode.QUEUE)
         queue.add_track([track1, track2, track3])
         queue.skip_track()
@@ -256,7 +264,9 @@ class TestQueueRemoveTrack:
         assert len(queue.tracks) == 1
         assert queue.tracks[0] == track2
 
-    def test_remove_track_does_not_affect_background(self, queue: Queue, track1: Track, track2: Track):
+    def test_remove_track_does_not_affect_background(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
         queue.set_background_tracks([track1, track2])
         queue.add_track([track1, track2])
         queue.remove_track(track1)
