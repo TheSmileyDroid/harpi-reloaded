@@ -1,24 +1,21 @@
-from collections.abc import Callable, Coroutine
-from typing import Any
+from collections.abc import Awaitable, Callable
 
 from harpi.application.player_service import PlayerService
-from harpi.application.commands.play import PlayCommand, PlayCommandHandler
-from harpi.application.commands.pause import PauseCommand, PauseCommandHandler
-from harpi.application.commands.skip import SkipCommand, SkipCommandHandler
-from harpi.application.commands.stop import StopCommand, StopCommandHandler
-from harpi.application.commands.resume import ResumeCommand, ResumeCommandHandler
+from harpi.application.commands import get_handlers, Handler
 
 
 class CommandRouter:
     def __init__(self, player_service: PlayerService, prefix: str = "-"):
         self._prefix = prefix
-        self._handlers: dict[str, Callable[[str], Coroutine[Any, Any, str]]] = {
-            "play": lambda args: PlayCommandHandler(player_service).handle(PlayCommand(query=args)),
-            "pause": lambda _: PauseCommandHandler(player_service).handle(PauseCommand()),
-            "skip": lambda _: SkipCommandHandler(player_service).handle(SkipCommand()),
-            "stop": lambda _: StopCommandHandler(player_service).handle(StopCommand()),
-            "resume": lambda _: ResumeCommandHandler(player_service).handle(ResumeCommand()),
-        }
+        self._player_service = player_service
+        self._handlers: dict[str, Callable[[str], Awaitable[str]]] = {}
+        for name, handler in get_handlers().items():
+            self._handlers[name] = self._wrap(handler)
+
+    def _wrap(self, handler: Handler) -> Callable[[str], Awaitable[str]]:
+        async def wrapped(args: str) -> str:
+            return await handler(self._player_service, args)
+        return wrapped
 
     async def dispatch(self, message: str) -> str | None:
         if not message:

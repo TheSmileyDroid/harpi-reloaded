@@ -33,6 +33,7 @@ addopts = [
 [tool.mutmut]
 paths_to_mutate = ["src/harpi/domain", "src/harpi/application"]
 tests_dir = ["test/unit"]
+also_copy = ["README.md", "src/harpi/infrastructure"]
 
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb"]

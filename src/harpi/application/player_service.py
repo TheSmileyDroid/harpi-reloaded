@@ -1,5 +1,6 @@
 from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProtocol
 from harpi.domain.queue import Queue
+from harpi.domain.track import Track
 
 
 class PlayerService:
@@ -11,6 +12,14 @@ class PlayerService:
     @property
     def queue(self) -> Queue:
         return self._queue
+
+    @property
+    def playing(self) -> Track | None:
+        return self._player.playing
+
+    @property
+    def is_paused(self) -> bool:
+        return self._player.is_paused
 
     async def play(self, link: str) -> None:
         track = await self._resolver.resolve(link)
