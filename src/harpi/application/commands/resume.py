@@ -4,7 +4,7 @@ from typing import Protocol
 
 
 class ResumePlayerServiceProtocol(Protocol):
-    def resume(self) -> None: ...
+    async def resume(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -17,5 +17,5 @@ class ResumeCommandHandler:
         self._player_service = player_service
 
     async def handle(self, command: ResumeCommand) -> str:
-        self._player_service.resume()
+        await self._player_service.resume()
         return "Música retomada."

@@ -16,24 +16,24 @@ class PlayerService:
         track = await self._resolver.resolve(link)
         self._queue.add_track(track)
         if self._player.playing is None:
-            self._player.play(track)
+            await self._player.play(track)
 
-    def on_track_end(self) -> None:
+    async def on_track_end(self) -> None:
         self._queue.skip_track()
         next_track = self._queue.get_current_track()
         if next_track is not None:
-            self._player.play(next_track)
+            await self._player.play(next_track)
 
-    def pause(self) -> None:
-        self._player.pause()
+    async def pause(self) -> None:
+        await self._player.pause()
 
-    def resume(self) -> None:
-        self._player.resume()
+    async def resume(self) -> None:
+        await self._player.resume()
 
-    def skip(self) -> None:
-        self._player.stop()
-        self.on_track_end()
+    async def skip(self) -> None:
+        await self._player.stop()
+        await self.on_track_end()
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self._queue.clear()
-        self._player.stop()
+        await self._player.stop()

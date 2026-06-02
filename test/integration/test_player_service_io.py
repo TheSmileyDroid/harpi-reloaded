@@ -36,7 +36,7 @@ class TestPlayerServiceWithRealResolver:
         assert first is not None
         assert first.source_id == "M8J9zHyyUYc"
 
-        svc.skip()
+        await svc.skip()
         assert len(svc.queue.tracks) == 1
         current = svc.queue.get_current_track()
         assert current is not None
@@ -51,7 +51,7 @@ class TestPlayerServiceWithRealResolver:
         await svc.play("https://youtu.be/M8J9zHyyUYc")
         assert len(svc.queue.tracks) == 1
 
-        svc.stop()
+        await svc.stop()
         assert len(svc.queue.tracks) == 0
 
     @pytest.mark.asyncio
@@ -64,9 +64,9 @@ class TestPlayerServiceWithRealResolver:
         await svc.play("https://youtu.be/M8J9zHyyUYc")
         await svc.play("https://youtu.be/dQw4w9WgXcQ")
 
-        svc.skip()
-        svc.skip()
-        svc.skip()
+        await svc.skip()
+        await svc.skip()
+        await svc.skip()
         assert len(svc.queue.tracks) == 2
         current = svc.queue.get_current_track()
         assert current is not None

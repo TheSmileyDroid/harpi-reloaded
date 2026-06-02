@@ -16,7 +16,8 @@ class Queue:
 
     def add_track(self, track: Track | list[Track]) -> None:
         if isinstance(track, list):
-            self._queue.extend(track)
+            # TODO: fix type hinting for list of tracks
+            self._queue.extend(track)  # type: ignore
         else:
             self._queue.append(track)
 

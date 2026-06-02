@@ -13,13 +13,7 @@ class FakeResolver(AudioResolverProtocol):
     async def resolve(self, link: str) -> Track:
         if link in self._failures:
             raise self._failures[link]
-        return Track(
-            link=link,
-            title="Fake Track",
-            duration=120,
-            source=Source.YOUTUBE,
-            resolved=True,
-        )
+        return Track(link=link, title="Fake Track", duration=120, source=Source.YOUTUBE, resolved=True)
 
 
 class FakePlayer(AudioPlayerProtocol):
@@ -30,21 +24,21 @@ class FakePlayer(AudioPlayerProtocol):
         self.is_stopped: bool = False
 
     @property
-    def playing(self):
+    def playing(self) -> Track | None:
         return self._playing
 
-    def play(self, track: Track):
+    async def play(self, track: Track) -> None:
         self._playing = track
         self.is_stopped = False
         self.is_paused = False
 
-    def pause(self):
+    async def pause(self) -> None:
         self.is_paused = True
 
-    def resume(self):
+    async def resume(self) -> None:
         self.is_paused = False
 
-    def stop(self):
+    async def stop(self) -> None:
         self._playing = None
         self.is_stopped = True
 
@@ -97,3 +91,39 @@ def spotify_track():
         duration=240,
         source=Source.SPOTIFY,
     )
+
+
+class FakeMessage:
+    def __init__(self, content: str, author_id: int = 1, bot: bool = False):
+        self.content = content
+        self.author = FakeUser(author_id, bot)
+        self.channel = FakeChannel()
+        self._sent: list[str] = []
+
+    async def reply(self, content: str) -> None:
+        self._sent.append(content)
+
+    @property
+    def last_reply(self) -> str | None:
+        return self._sent[-1] if self._sent else None
+
+
+class FakeUser:
+    def __init__(self, id: int = 1, bot: bool = False):
+        self.id = id
+        self.bot = bot
+        self.name = f"User{id}"
+
+
+class FakeChannel:
+    def __init__(self, id: int = 1):
+        self.id = id
+        self.name = f"channel{id}"
+        self._sent: list[str] = []
+
+    async def send(self, content: str) -> None:
+        self._sent.append(content)
+
+    @property
+    def last_message(self) -> str | None:
+        return self._sent[-1] if self._sent else None

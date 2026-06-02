@@ -4,7 +4,7 @@ from typing import Protocol
 
 
 class StopPlayerServiceProtocol(Protocol):
-    def stop(self) -> None: ...
+    async def stop(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -17,5 +17,5 @@ class StopCommandHandler:
         self._player_service = player_service
 
     async def handle(self, command: StopCommand) -> str:
-        self._player_service.stop()
+        await self._player_service.stop()
         return "Fila limpa e música parada."

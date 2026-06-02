@@ -51,7 +51,7 @@ class TestResumeCommandHandler:
     @pytest.mark.asyncio
     async def test_resume_command_success(self, player_service: PlayerService):
         await player_service.play("https://youtu.be/first")
-        player_service.pause()
+        await player_service.pause()
         assert player_service._player.is_paused is True
 
         handler = ResumeCommandHandler(player_service=player_service)

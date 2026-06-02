@@ -4,7 +4,7 @@ from typing import Protocol
 
 
 class SkipPlayerServiceProtocol(Protocol):
-    def skip(self) -> None: ...
+    async def skip(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -17,5 +17,5 @@ class SkipCommandHandler:
         self._player_service = player_service
 
     async def handle(self, command: SkipCommand) -> str:
-        self._player_service.skip()
+        await self._player_service.skip()
         return "Música pulada."

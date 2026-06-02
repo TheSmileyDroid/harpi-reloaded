@@ -4,7 +4,7 @@ from harpi.application.ports.command import Command
 
 
 class PausePlayerServiceProtocol(Protocol):
-    def pause(self) -> None: ...
+    async def pause(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -17,5 +17,5 @@ class PauseCommandHandler:
         self._player_service = player_service
 
     async def handle(self, command: PauseCommand) -> str:
-        self._player_service.pause()
+        await self._player_service.pause()
         return "Música pausada."
