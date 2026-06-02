@@ -69,6 +69,48 @@ Remove tests that are:
 
 ---
 
+## Commands
+
+### Running Tools (always use `uv run`)
+
+| Tool | Command |
+|------|---------|
+| Tests | `uv run pytest test/ -v` |
+| Type check | `uv run ty check src/harpi/ test/ main.py` |
+| Mutation | `uv run mutmut run` |
+| Lint | `uv run ruff check src/ test/` |
+| Format | `uv run ruff format src/ test/` |
+| All | `uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run pytest test/ -v --ignore=test/e2e` |
+
+### Mutmut Config Caveats
+- Mutmut creates a `mutants/` directory and runs tests from there
+- The `paths_to_mutate` directories are copied into `mutants/src/` — any other source
+  directories needed at test time must be listed in `also_copy` in `[tool.mutmut]`
+- Example: if tests import `harpi.infrastructure`, add `also_copy = ["src/harpi/infrastructure"]`
+- Always run with `uv run mutmut run`, never `python -m mutmut run` (system Python may be
+  a different version and fails with `set_start_method('fork')` errors)
+- Run `rm -rf mutants/` before re-running if the config changed
+
+### Ty Type Checker (v0.0.39)
+- Must pass `main.py` explicitly if it's not under `src/harpi/` or `test/`
+- Keyword arguments are not allowed for positional parameters in function calls
+  (call `handle(service, args)` not `handle(service=service, args=args)`)
+- Lambda return types are not always inferred correctly — prefer named wrapper functions:
+  ```python
+  def _wrap(self, handler: Handler) -> Callable[[str], Awaitable[str]]:
+      async def wrapped(args: str) -> str:
+          return await handler(self._player_service, args)
+      return wrapped
+  ```
+
+### Dependency Management (uv)
+- `uv add <package>` — adds to pyproject.toml and installs
+- `uv pip install -e .` — installs project in dev mode (needed for mutmut to resolve imports)
+- `uv pip list | grep <name>` — check if a package is installed
+- Always check both `pyproject.toml` and actual `uv pip list` after adding a dependency
+
+---
+
 ## Architecture
 
 ### Clean Architecture Layers
@@ -77,7 +119,7 @@ src/harpi/
 ├── domain/          # Track, Queue, LoopMode (no dependencies)
 ├── application/     # PlayerService, Commands, Ports
 │   ├── ports/       # Protocol interfaces
-│   └── commands/    # Command + CommandHandler pairs
+│   └── commands/    # Handlers registered via @register decorator
 └── infrastructure/  # Real IO adapters (YoutubeResolver, DiscordPlayer)
 ```
 
@@ -86,8 +128,17 @@ src/harpi/
 - **Application**: depends only on domain; defines ports as `Protocol` interfaces that Infrastructure must implement
 - **Infrastructure**: implements ports with real IO; Pydantic lives here (deserialization,
   API schemas, external data validation) — not in the domain
-- **Commands**: frozen dataclass + handler with narrow protocol
-- Each handler defines its own protocol
+- **Commands**: async functions decorated with `@register("name")`, collected into a
+  registry dict at import time
+
+### Command Registry Pattern
+- Define handlers as plain async functions in `handlers.py`
+- Decorate with `@register("command_name")` from `harpi.application.commands`
+- The decorator stores the function in `_registry` dict at module load time
+- `get_handlers()` returns a copy of the registry for the router to consume
+- New command = 3 lines: `@register("name")` + `async def handler(service, args):`
+- The handlers module must be imported for decorators to execute — add
+  `from harpi.application.commands import handlers` at the end of `__init__.py`
 
 ### Code Style
 - Python 3.12+, type hints on all public methods
@@ -96,3 +147,18 @@ src/harpi/
   classes in the domain layer; keep it dependency-free
 - `Pydantic BaseModel` for infrastructure DTOs and API schemas only
 - `Protocol` for dependency inversion
+
+## Fakes & Test Doubles
+
+### FakeResolver Behavior
+- `FakeResolver.resolve(link)` always returns `Track(title="Fake Track", duration=120, ...)`
+  regardless of the link — it does NOT use the `track1`, `track2`, `track3` fixtures
+- Use `set_failure(link, exc)` to simulate errors
+- For custom track properties (different titles, durations, None titles), create an inline
+  `AudioResolverProtocol` implementation in the test
+
+### FakePlayer State
+- `FakePlayer.playing` — the currently playing track (or None)
+- `FakePlayer.is_paused` / `FakePlayer.is_stopped` — boolean flags
+- `FakePlayer.background_tracks` — list of background tracks
+- All player methods are async (`play`, `pause`, `resume`, `stop`)
