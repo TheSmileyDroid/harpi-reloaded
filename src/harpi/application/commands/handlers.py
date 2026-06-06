@@ -1,5 +1,6 @@
-from harpi.application.commands import register
+from harpi.application.commands import register, EmbedData, Response
 from harpi.application.player_service import PlayerService
+from harpi.domain.track import Track
 
 
 @register("play")
@@ -42,26 +43,41 @@ def _format_duration(seconds: int | None) -> str:
     return f"{m:02d}:{s:02d}"
 
 
-def _format_queue(service: PlayerService) -> str:
+def _format_playing_duration(current: Track, position: float | None) -> str:
+    duration = _format_duration(current.duration)
+    if position is not None and current.duration is not None:
+        pos = _format_duration(int(position))
+        return f"{pos}/{duration}"
+    return duration
+
+
+def _build_queue_embed(service: PlayerService) -> str | EmbedData:
     current = service.playing
     tracks = service.queue.tracks
     loop = service.queue.loop_mode.value
+    total = len(tracks)
 
     if current is None:
-        return f"Nada tocando no momento.\nFila: {len(tracks)} músicas | Loop: {loop}"
+        return EmbedData(
+            description="Nada tocando no momento.",
+            footer=f"Fila: {total} músicas | Loop: {loop}",
+        )
 
-    lines: list[str] = []
+    duration = _format_playing_duration(current, service.position)
     current_title = current.title or "Desconhecida"
-    duration = _format_duration(current.duration)
-    lines.append(f"▶ {current_title} ({duration})")
+    lines = [f"{current_title} ({duration})"]
+
     for i, t in enumerate(tracks[1:], start=1):
         td = _format_duration(t.duration)
         title = t.title or "Desconhecida"
-        lines.append(f"  {i}. {title} ({td})")
-    lines.append(f"\nTotal: {len(tracks)} músicas | Loop: {loop}")
-    return "\n".join(lines)
+        lines.append(f"{i}. {title} ({td})")
+
+    return EmbedData(
+        description="\n".join(lines),
+        footer=f"Total: {total} músicas | Loop: {loop}",
+    )
 
 
 @register("queue")
-async def handle_queue(service: PlayerService, args: str) -> str:
-    return _format_queue(service)
+async def handle_queue(service: PlayerService, args: str) -> Response:
+    return _build_queue_embed(service)

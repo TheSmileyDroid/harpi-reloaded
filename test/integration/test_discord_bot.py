@@ -1,6 +1,12 @@
 import pytest
+from harpi.application.commands import Response
 from harpi.application.player_service import PlayerService
 from harpi.infrastructure.discord_bot import HarpiBot
+
+
+def _as_str(response: Response) -> str:
+    assert isinstance(response, str)
+    return response
 
 
 @pytest.fixture
@@ -17,7 +23,7 @@ class TestHarpiBotMessageHandling:
     async def test_play_command_responds(self, bot: HarpiBot):
         response = await bot.on_message("-play https://youtu.be/abc", author_is_bot=False)
         assert response is not None
-        assert "Adicionado" in response
+        assert "Adicionado" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_bot_message_is_ignored(self, bot: HarpiBot):
@@ -28,31 +34,32 @@ class TestHarpiBotMessageHandling:
     async def test_pause_command_responds(self, bot: HarpiBot):
         response = await bot.on_message("-pause", author_is_bot=False)
         assert response is not None
-        assert "pausada" in response
+        assert "pausada" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_skip_command_responds(self, bot: HarpiBot):
         response = await bot.on_message("-skip", author_is_bot=False)
         assert response is not None
-        assert "pulada" in response
+        assert "pulada" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_stop_command_responds(self, bot: HarpiBot):
         response = await bot.on_message("-stop", author_is_bot=False)
         assert response is not None
-        assert "parada" in response
+        assert "parada" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_resume_command_responds(self, bot: HarpiBot):
         response = await bot.on_message("-resume", author_is_bot=False)
         assert response is not None
-        assert "retomada" in response
+        assert "retomada" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_unknown_command_returns_help(self, bot: HarpiBot):
         response = await bot.on_message("-invalid", author_is_bot=False)
         assert response is not None
-        assert "help" in response.lower() or "comandos" in response.lower()
+        msg = _as_str(response).lower()
+        assert "help" in msg or "comandos" in msg
 
     @pytest.mark.asyncio
     async def test_text_without_prefix_returns_none(self, bot: HarpiBot):
@@ -70,7 +77,8 @@ class TestHarpiBotMessageHandling:
 
         response = await bot.on_message("-play https://youtu.be/bad", author_is_bot=False)
         assert response is not None
-        assert "error" in response.lower() or "erro" in response.lower()
+        msg = _as_str(response).lower()
+        assert "error" in msg or "erro" in msg
 
 
 @pytest.mark.integration
@@ -84,6 +92,6 @@ class TestHarpiBotCustomTokenAndPrefix:
 
         response = await bot.on_message("!play https://youtu.be/abc", author_is_bot=False)
         assert response is not None
-        assert "Adicionado" in response
+        assert "Adicionado" in _as_str(response)
 
 

@@ -1,4 +1,6 @@
 import pytest
+from collections.abc import Callable, Coroutine
+from typing import Any
 from harpi.domain.track import Track, Source
 from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProtocol
 
@@ -27,7 +29,11 @@ class FakePlayer(AudioPlayerProtocol):
     def playing(self) -> Track | None:
         return self._playing
 
-    async def play(self, track: Track) -> None:
+    @property
+    def position(self) -> float | None:
+        return None
+
+    async def play(self, track: Track, on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
         self._playing = track
         self.is_stopped = False
         self.is_paused = False

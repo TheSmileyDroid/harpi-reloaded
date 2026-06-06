@@ -1,7 +1,17 @@
 from collections.abc import Callable, Awaitable
+from dataclasses import dataclass
 from harpi.application.player_service import PlayerService
 
-Handler = Callable[[PlayerService, str], Awaitable[str]]
+
+@dataclass
+class EmbedData:
+    title: str = ""
+    description: str = ""
+    footer: str = ""
+
+
+Response = str | EmbedData
+Handler = Callable[[PlayerService, str], Awaitable[Response]]
 _registry: dict[str, Handler] = {}
 
 

@@ -1,7 +1,13 @@
 import pytest
+from harpi.application.commands import Response
 from harpi.application.player_service import PlayerService
 from harpi.infrastructure.command_router import CommandRouter
 from test.unit.conftest import FakeResolver, FakePlayer
+
+
+def _as_str(response: Response) -> str:
+    assert isinstance(response, str)
+    return response
 
 
 @pytest.fixture
@@ -40,13 +46,15 @@ class TestCommandRouterDispatch:
     async def test_unknown_command_returns_help(self, router: CommandRouter):
         response = await router.dispatch("-invalid")
         assert response is not None
-        assert "help" in response.lower() or "comandos" in response.lower()
+        msg = _as_str(response).lower()
+        assert "help" in msg or "comandos" in msg
 
     @pytest.mark.asyncio
     async def test_empty_string_returns_help(self, router: CommandRouter):
         response = await router.dispatch("")
         assert response is not None
-        assert "help" in response.lower() or "comandos" in response.lower()
+        msg = _as_str(response).lower()
+        assert "help" in msg or "comandos" in msg
 
     @pytest.mark.asyncio
     async def test_message_without_prefix_returns_none(self, router: CommandRouter):
@@ -62,7 +70,8 @@ class TestCommandRouterDispatch:
     async def test_play_command_without_args_returns_error(self, router: CommandRouter):
         response = await router.dispatch("-play")
         assert response is not None
-        assert "vazio" in response.lower() or "url" in response.lower()
+        msg = _as_str(response).lower()
+        assert "vazio" in msg or "url" in msg
 
 
 class TestCommandRouterCustomPrefix:

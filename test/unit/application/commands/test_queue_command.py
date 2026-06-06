@@ -19,65 +19,77 @@ def service():
 class TestQueueCommand:
     async def test_queue_empty(self):
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         svc = PlayerService(resolver=FakeResolver(), player=FakePlayer())
         result = await handle_queue(svc, "")
 
-        assert result == "Nada tocando no momento.\nFila: 0 músicas | Loop: off"
+        assert isinstance(result, EmbedData)
+        assert result.description == "Nada tocando no momento."
+        assert result.footer == "Fila: 0 músicas | Loop: off"
 
     async def test_queue_with_one_track(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
 
-        assert result == "▶ Fake Track (02:00)\n\nTotal: 1 músicas | Loop: off"
+        assert isinstance(result, EmbedData)
+        assert "Fake Track (02:00)" in result.description
+        assert result.footer == "Total: 1 músicas | Loop: off"
 
     async def test_queue_with_multiple_tracks(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
         await service.play("https://youtu.be/def")
         await service.play("https://youtu.be/ghi")
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
 
-        lines = result.strip().split("\n")
-        assert lines[0] == "▶ Fake Track (02:00)"
-        assert lines[1] == "  1. Fake Track (02:00)"
-        assert lines[2] == "  2. Fake Track (02:00)"
-        assert lines[3] == ""
-        assert lines[4] == "Total: 3 músicas | Loop: off"
+        assert isinstance(result, EmbedData)
+        lines = result.description.split("\n")
+        assert "Fake Track (02:00)" in lines[0]
+        assert "1. Fake Track (02:00)" in lines[1]
+        assert "2. Fake Track (02:00)" in lines[2]
 
     async def test_queue_shows_playing_track_first(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
         await service.play("https://youtu.be/ghi")
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
 
-        lines = result.strip().split("\n")
-        assert "▶" in lines[0]
+        assert isinstance(result, EmbedData)
+        lines = result.description.split("\n")
+        assert "abc" in lines[0] or "Fake Track" in lines[0]
         assert "1." in lines[1]
 
     async def test_queue_track_without_title_shows_fallback_current(self):
         svc = PlayerService(resolver=NoTitleResolver(), player=FakePlayer())
         await svc.play("https://youtu.be/abc")
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         result = await handle_queue(svc, "")
 
-        assert "Desconhecida" in result
-        assert "▶ Desconhecida (02:00)" in result
+        assert isinstance(result, EmbedData)
+        assert "Desconhecida" in result.description
+        assert "Desconhecida (02:00)" in result.description
 
     async def test_queue_track_without_title_shows_fallback_upcoming(self):
         svc = PlayerService(resolver=NoTitleResolver(), player=FakePlayer())
         await svc.play("https://youtu.be/abc")
         await svc.play("https://youtu.be/def")
         from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
 
         result = await handle_queue(svc, "")
 
-        assert "1. Desconhecida (02:00)" in result
+        assert isinstance(result, EmbedData)
+        assert "1. Desconhecida (02:00)" in result.description
 
     async def test_format_duration_returns_formatted_time(self):
         from harpi.application.commands.handlers import _format_duration
