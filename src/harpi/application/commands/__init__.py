@@ -19,6 +19,7 @@ def register(name: str) -> Callable[[Handler], Handler]:
     def decorator(func: Handler) -> Handler:
         _registry[name] = func
         return func
+
     return decorator
 
 

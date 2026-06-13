@@ -39,7 +39,9 @@ class HarpiBot:
         logger.debug("Created guild state for guild %d", guild_id)
         return router
 
-    async def on_message(self, content: str, author_is_bot: bool) -> str | EmbedData | None:
+    async def on_message(
+        self, content: str, author_is_bot: bool
+    ) -> str | EmbedData | None:
         if author_is_bot or self._router is None:
             return None
         return await self._router.dispatch(content)
@@ -53,7 +55,11 @@ class HarpiBot:
             return None
 
         guild_id = message.guild.id if message.guild else 0
-        cmd = content[len(self._prefix):].split()[0].lower() if len(content) > len(self._prefix) else ""
+        cmd = (
+            content[len(self._prefix) :].split()[0].lower()
+            if len(content) > len(self._prefix)
+            else ""
+        )
 
         if cmd == "play":
             player = self._guild_players.get(guild_id)
@@ -69,7 +75,11 @@ class HarpiBot:
                     if existing.channel != channel:
                         await existing.move_to(channel)
                 else:
-                    logger.info("Joining voice channel %s in guild %s", channel.name, message.guild)
+                    logger.info(
+                        "Joining voice channel %s in guild %s",
+                        channel.name,
+                        message.guild,
+                    )
                     await player.connect(channel)
 
         router = self._ensure_guild_state(guild_id)
@@ -79,5 +89,7 @@ class HarpiBot:
         try:
             return await router.dispatch(content)
         except Exception:
-            logger.exception("Unhandled error processing message from %s", message.author)
+            logger.exception(
+                "Unhandled error processing message from %s", message.author
+            )
             return "Ocorreu um erro interno."

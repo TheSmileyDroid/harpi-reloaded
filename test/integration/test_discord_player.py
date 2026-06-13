@@ -28,6 +28,7 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def discord_client():
     import discord
+
     token, guild_id, channel_id = _require_env()
     intents = discord.Intents.default()
     intents.message_content = True
@@ -39,6 +40,7 @@ async def discord_client():
         await client.connect()
 
     import asyncio
+
     task = asyncio.create_task(startup())
     await asyncio.sleep(3)
     while not client.is_ready():

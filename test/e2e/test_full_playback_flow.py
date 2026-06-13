@@ -57,6 +57,7 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def discord_client():
     import discord
+
     token, guild_id, channel_id = _require_env()
     intents = discord.Intents.default()
     intents.message_content = True
@@ -139,7 +140,10 @@ class TestFullPlaybackJourney:
         assert response is not None
 
         if isinstance(response, EmbedData):
-            assert "Add" in response.description or "adicion" in response.description.lower()
+            assert (
+                "Add" in response.description
+                or "adicion" in response.description.lower()
+            )
         else:
             assert "Add" in response or "adicion" in response.lower()
 
@@ -156,14 +160,15 @@ class TestFullPlaybackJourney:
             guild=message.guild,
             author=FakeAuthor(bot=False),
         )
-        stop_msg.author.voice = FakeVoiceState(
-            message.author.voice.channel
-        )
+        stop_msg.author.voice = FakeVoiceState(message.author.voice.channel)
         stop_response = await bot.handle_discord_message(stop_msg)
         assert stop_response is not None
 
         if isinstance(stop_response, EmbedData):
-            assert "par" in stop_response.description or "stop" in stop_response.description.lower()
+            assert (
+                "par" in stop_response.description
+                or "stop" in stop_response.description.lower()
+            )
         else:
             assert "par" in stop_response or "stop" in stop_response.lower()
 

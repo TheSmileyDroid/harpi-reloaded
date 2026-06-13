@@ -1,7 +1,12 @@
 import asyncio
 
 from pytubefix.async_youtube import AsyncYouTube
-from pytubefix.exceptions import RegexMatchError, VideoUnavailable, VideoPrivate, MaxRetriesExceeded
+from pytubefix.exceptions import (
+    RegexMatchError,
+    VideoUnavailable,
+    VideoPrivate,
+    MaxRetriesExceeded,
+)
 
 from harpi.domain.track import Track, Source
 from harpi.application.ports.audio import AudioResolverProtocol
@@ -27,9 +32,7 @@ class YoutubeResolver(AudioResolverProtocol):
             title = await asyncio.wait_for(yt.title(), timeout=self.TIMEOUT)
             duration = await asyncio.wait_for(yt.length(), timeout=self.TIMEOUT)
         except asyncio.TimeoutError as e:
-            raise TimeoutError(
-                f"Resolution timed out after {self.TIMEOUT}s"
-            ) from e
+            raise TimeoutError(f"Resolution timed out after {self.TIMEOUT}s") from e
         except (VideoUnavailable, VideoPrivate, RegexMatchError) as e:
             raise InvalidLinkError(str(e)) from e
         except (MaxRetriesExceeded, OSError) as e:

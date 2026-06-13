@@ -52,7 +52,11 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._voice_client is None:
             raise RuntimeError("Not connected to a voice channel")
 
-    async def play(self, track: Track, on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
+    async def play(
+        self,
+        track: Track,
+        on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    ) -> None:
         self._check_connected()
         self._current = track
         self._start_time = time.monotonic()
@@ -125,6 +129,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         if stream is None:
             raise ValueError(f"No audio stream available for {track.link}")
         import discord
+
         return discord.FFmpegPCMAudio(
             stream.url,
             before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",

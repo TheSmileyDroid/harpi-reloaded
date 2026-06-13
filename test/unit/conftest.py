@@ -15,7 +15,13 @@ class FakeResolver(AudioResolverProtocol):
     async def resolve(self, link: str) -> Track:
         if link in self._failures:
             raise self._failures[link]
-        return Track(link=link, title="Fake Track", duration=120, source=Source.YOUTUBE, resolved=True)
+        return Track(
+            link=link,
+            title="Fake Track",
+            duration=120,
+            source=Source.YOUTUBE,
+            resolved=True,
+        )
 
 
 class FakePlayer(AudioPlayerProtocol):
@@ -33,7 +39,11 @@ class FakePlayer(AudioPlayerProtocol):
     def position(self) -> float | None:
         return None
 
-    async def play(self, track: Track, on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None) -> None:
+    async def play(
+        self,
+        track: Track,
+        on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    ) -> None:
         self._playing = track
         self.is_stopped = False
         self.is_paused = False

@@ -14,11 +14,16 @@ class CommandRouter:
         self._handlers: dict[str, Callable[[str], Awaitable[Response]]] = {}
         for name, handler in get_handlers().items():
             self._handlers[name] = self._wrap(handler)
-        logger.info("Registered %d command handlers: %s", len(self._handlers), ", ".join(self._handlers))
+        logger.info(
+            "Registered %d command handlers: %s",
+            len(self._handlers),
+            ", ".join(self._handlers),
+        )
 
     def _wrap(self, handler: Handler) -> Callable[[str], Awaitable[Response]]:
         async def wrapped(args: str) -> Response:
             return await handler(self._player_service, args)
+
         return wrapped
 
     async def dispatch(self, message: str) -> Response | None:
