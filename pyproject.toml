@@ -23,7 +23,10 @@ dependencies = [
 
 
 [tool.pytest.ini_options]
-markers = ["integration: requires network (deselect with '-m not integration')"]
+markers = [
+    "integration: requires network (deselect with '-m not integration')",
+    "e2e: requires full Discord bot (deselect with '-m not e2e')",
+]
 asyncio_mode = "auto"
 asyncio_default_test_loop_scope = "session"
 addopts = [

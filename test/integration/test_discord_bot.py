@@ -21,13 +21,17 @@ def bot():
 class TestHarpiBotMessageHandling:
     @pytest.mark.asyncio
     async def test_play_command_responds(self, bot: HarpiBot):
-        response = await bot.on_message("-play https://youtu.be/abc", author_is_bot=False)
+        response = await bot.on_message(
+            "-play https://youtu.be/abc", author_is_bot=False
+        )
         assert response is not None
         assert "Adicionado" in _as_str(response)
 
     @pytest.mark.asyncio
     async def test_bot_message_is_ignored(self, bot: HarpiBot):
-        response = await bot.on_message("-play https://youtu.be/abc", author_is_bot=True)
+        response = await bot.on_message(
+            "-play https://youtu.be/abc", author_is_bot=True
+        )
         assert response is None
 
     @pytest.mark.asyncio
@@ -75,7 +79,9 @@ class TestHarpiBotMessageHandling:
         svc = PlayerService(resolver=resolver, player=FakePlayer())
         bot = HarpiBot(player_service=svc)
 
-        response = await bot.on_message("-play https://youtu.be/bad", author_is_bot=False)
+        response = await bot.on_message(
+            "-play https://youtu.be/bad", author_is_bot=False
+        )
         assert response is not None
         msg = _as_str(response).lower()
         assert "error" in msg or "erro" in msg
@@ -90,8 +96,8 @@ class TestHarpiBotCustomTokenAndPrefix:
         svc = PlayerService(resolver=FakeResolver(), player=FakePlayer())
         bot = HarpiBot(player_service=svc, prefix="!")
 
-        response = await bot.on_message("!play https://youtu.be/abc", author_is_bot=False)
+        response = await bot.on_message(
+            "!play https://youtu.be/abc", author_is_bot=False
+        )
         assert response is not None
         assert "Adicionado" in _as_str(response)
-
-

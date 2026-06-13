@@ -20,7 +20,9 @@ BOT_COLOR = 0x57F287
 
 async def main():
     load_dotenv()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
 
     token = os.environ.get("DISCORD_TOKEN")
     if not token:
