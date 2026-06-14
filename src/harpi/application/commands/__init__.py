@@ -10,20 +10,29 @@ class EmbedData:
     footer: str = ""
 
 
+@dataclass
+class CommandHandler:
+    func: Callable[[PlayerService, str], Awaitable[str | EmbedData]]
+    guild_only: bool = False
+    voice: bool = False
+
+
 Response = str | EmbedData
 Handler = Callable[[PlayerService, str], Awaitable[Response]]
-_registry: dict[str, Handler] = {}
+_registry: dict[str, CommandHandler] = {}
 
 
-def register(name: str) -> Callable[[Handler], Handler]:
+def register(
+    name: str, guild_only: bool = False, voice: bool = False  # pragma: no mutate
+) -> Callable[[Handler], Handler]:
     def decorator(func: Handler) -> Handler:
-        _registry[name] = func
+        _registry[name] = CommandHandler(func=func, guild_only=guild_only, voice=voice)
         return func
 
     return decorator
 
 
-def get_handlers() -> dict[str, Handler]:
+def get_handlers() -> dict[str, CommandHandler]:
     return dict(_registry)
 
 

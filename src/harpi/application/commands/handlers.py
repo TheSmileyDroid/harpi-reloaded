@@ -3,7 +3,7 @@ from harpi.application.player_service import PlayerService
 from harpi.domain.track import Track
 
 
-@register("play")
+@register("play", guild_only=True, voice=True)
 async def handle_play(service: PlayerService, args: str) -> str:
     query = args.strip()
     if not query:
@@ -12,31 +12,31 @@ async def handle_play(service: PlayerService, args: str) -> str:
     return f"Adicionado: {query}"
 
 
-@register("pause")
+@register("pause", guild_only=True, voice=True)
 async def handle_pause(service: PlayerService, args: str) -> str:
     await service.pause()
     return "Música pausada."
 
 
-@register("resume")
+@register("resume", guild_only=True, voice=True)
 async def handle_resume(service: PlayerService, args: str) -> str:
     await service.resume()
     return "Música retomada."
 
 
-@register("skip")
+@register("skip", guild_only=True, voice=True)
 async def handle_skip(service: PlayerService, args: str) -> str:
     await service.skip()
     return "Música pulada."
 
 
-@register("stop")
+@register("stop", guild_only=True, voice=True)
 async def handle_stop(service: PlayerService, args: str) -> str:
     await service.stop()
     return "Fila limpa e música parada."
 
 
-@register("bg")
+@register("bg", guild_only=True, voice=True)
 async def handle_bg(service: PlayerService, args: str) -> str:
     query = args.strip()
     if not query:
@@ -45,7 +45,7 @@ async def handle_bg(service: PlayerService, args: str) -> str:
     return f"Música de fundo adicionada: {query}"
 
 
-@register("bgrm")
+@register("bgrm", guild_only=True, voice=True)
 async def handle_bgrm(service: PlayerService, args: str) -> str:
     index_str = args.strip()
     if not index_str:

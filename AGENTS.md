@@ -80,7 +80,15 @@ Remove tests that are:
 | Mutation | `uv run mutmut run` |
 | Lint | `uv run ruff check src/ test/` |
 | Format | `uv run ruff format src/ test/` |
-| All | `uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run pytest test/ -v --ignore=test/e2e` |
+| All | `uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run pytest test/ -v` |
+
+### Commit Workflow
+- Before committing, check Linear for the task currently **In Progress**
+- Include the task ID (e.g. `SMI-13`) in the commit message footer
+- Use conventional commits format and keep messages short
+- Run the full check suite (`uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run pytest test/ -v`) before committing
+
+> **E2E opt-in:** E2E tests are excluded by default. Run with `uv run pytest test/e2e/ -v` or `uv run pytest test/ -v --override-ini='addopts='` to include them.
 
 ### Mutmut Config Caveats
 - Mutmut creates a `mutants/` directory and runs tests from there

@@ -30,6 +30,13 @@ class FakePlayer(AudioPlayerProtocol):
         self.background_tracks: list[Track] = []
         self.is_paused: bool = False
         self.is_stopped: bool = False
+        self.volume: float = 1.0
+        self.background_volume: float = 0.5
+        self.is_ducking: bool = False
+        self._duck_level: float = 0.2
+        self._saved_background_volume: float | None = None
+        self.on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None
+        self._position: float | None = None
 
     @property
     def playing(self) -> Track | None:
@@ -37,7 +44,7 @@ class FakePlayer(AudioPlayerProtocol):
 
     @property
     def position(self) -> float | None:
-        return None
+        return self._position
 
     async def play(
         self,
@@ -47,6 +54,7 @@ class FakePlayer(AudioPlayerProtocol):
         self._playing = track
         self.is_stopped = False
         self.is_paused = False
+        self.on_finish = on_finish
 
     async def pause(self) -> None:
         self.is_paused = True
@@ -57,6 +65,40 @@ class FakePlayer(AudioPlayerProtocol):
     async def stop(self) -> None:
         self._playing = None
         self.is_stopped = True
+
+    def set_volume(self, volume: float) -> None:
+        if not 0.0 <= volume <= 1.0:
+            raise ValueError(f"Volume must be between 0.0 and 1.0, got {volume}")
+        self.volume = volume
+
+    def set_background_volume(self, volume: float) -> None:
+        if not 0.0 <= volume <= 1.0:
+            raise ValueError(
+                f"Background volume must be between 0.0 and 1.0, got {volume}"
+            )
+        self.background_volume = volume
+
+    def set_ducking(self, duck_level: float) -> None:
+        if not 0.0 <= duck_level <= 1.0:
+            raise ValueError(
+                f"Duck level must be between 0.0 and 1.0, got {duck_level}"
+            )
+        self._duck_level = duck_level
+
+    async def duck(self) -> None:
+        if self.is_ducking:
+            return
+        self._saved_background_volume = self.background_volume
+        self.background_volume = self._duck_level
+        self.is_ducking = True
+
+    async def unduck(self) -> None:
+        if not self.is_ducking:
+            return
+        if self._saved_background_volume is not None:
+            self.background_volume = self._saved_background_volume
+            self._saved_background_volume = None
+        self.is_ducking = False
 
 
 @pytest.fixture

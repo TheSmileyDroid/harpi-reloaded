@@ -56,7 +56,7 @@ async def discord_client():
         pass
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 async def voice_client(discord_client):
     client, guild_id, channel_id = discord_client
     guild = client.get_guild(guild_id)

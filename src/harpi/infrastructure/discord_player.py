@@ -26,9 +26,14 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._paused_position: float | None = None
         self._on_finish_callback: Callable[[], Coroutine[Any, Any, None]] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._duck_level: float = 0.2
+        self._saved_background_volume: float | None = None
         self.background_tracks: list[Track] = []
         self.is_paused: bool = False
         self.is_stopped: bool = False
+        self.volume: float = 1.0
+        self.background_volume: float = 0.5
+        self.is_ducking: bool = False
 
     @property
     def playing(self) -> Track | None:
@@ -109,6 +114,45 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._start_time = None
         if self._on_finish_callback is not None and self._loop is not None:
             asyncio.run_coroutine_threadsafe(self._on_finish_callback(), self._loop)
+
+    def set_volume(self, volume: float) -> None:
+        if not 0.0 <= volume <= 1.0:
+            raise ValueError(f"Volume must be between 0.0 and 1.0, got {volume}")
+        self.volume = volume
+        logger.info("Volume set to %s", volume)
+
+    def set_background_volume(self, volume: float) -> None:
+        if not 0.0 <= volume <= 1.0:
+            raise ValueError(
+                f"Background volume must be between 0.0 and 1.0, got {volume}"
+            )
+        self.background_volume = volume
+        logger.info("Background volume set to %s", volume)
+
+    def set_ducking(self, duck_level: float) -> None:
+        if not 0.0 <= duck_level <= 1.0:
+            raise ValueError(
+                f"Duck level must be between 0.0 and 1.0, got {duck_level}"
+            )
+        self._duck_level = duck_level
+        logger.info("Duck level set to %s", duck_level)
+
+    async def duck(self) -> None:
+        if self.is_ducking:
+            return
+        self._saved_background_volume = self.background_volume
+        self.background_volume = self._duck_level
+        self.is_ducking = True
+        logger.info("Ducking: background volume -> %s", self._duck_level)
+
+    async def unduck(self) -> None:
+        if not self.is_ducking:
+            return
+        if self._saved_background_volume is not None:
+            self.background_volume = self._saved_background_volume
+            self._saved_background_volume = None
+        self.is_ducking = False
+        logger.info("Unducking: background volume restored to %s", self.background_volume)
 
     def set_voice_client(self, vc: Any) -> None:
         self._voice_client = vc

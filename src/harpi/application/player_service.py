@@ -29,6 +29,7 @@ class PlayerService:
         track = await self._resolver.resolve(link)
         self._queue.add_track(track)
         if self._player.playing is None:
+            await self._player.duck()
             await self._player.play(track, on_finish=self.on_track_end)
 
     async def add_background_track(self, link: str) -> None:
@@ -43,6 +44,8 @@ class PlayerService:
         next_track = self._queue.get_current_track()
         if next_track is not None:
             await self._player.play(next_track, on_finish=self.on_track_end)
+        else:
+            await self._player.unduck()
 
     async def pause(self) -> None:
         await self._player.pause()
@@ -57,3 +60,13 @@ class PlayerService:
     async def stop(self) -> None:
         self._queue.clear()
         await self._player.stop()
+        await self._player.unduck()
+
+    def set_volume(self, volume: float) -> None:
+        self._player.set_volume(volume)
+
+    def set_background_volume(self, volume: float) -> None:
+        self._player.set_background_volume(volume)
+
+    def set_ducking(self, duck_level: float) -> None:
+        self._player.set_ducking(duck_level)

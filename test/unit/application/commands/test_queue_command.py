@@ -39,6 +39,21 @@ class TestQueueCommand:
         assert "Fake Track (02:00)" in result.description
         assert result.footer == "Total: 1 músicas | Loop: off"
 
+    async def test_queue_with_one_track_shows_position(self):
+        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
+        from test.unit.conftest import FakeResolver, FakePlayer
+
+        player = FakePlayer()
+        player._position = 45.0
+        svc = PlayerService(resolver=FakeResolver(), player=player)
+        await svc.play("https://youtu.be/abc")
+
+        result = await handle_queue(svc, "")
+
+        assert isinstance(result, EmbedData)
+        assert "00:45/02:00" in result.description
+
     async def test_queue_with_multiple_tracks(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
         await service.play("https://youtu.be/def")
@@ -99,6 +114,28 @@ class TestQueueCommand:
         assert _format_duration(3661) == "61:01"
         assert _format_duration(None) == "--:--"
 
+    async def test_format_playing_duration_with_position_and_duration(
+        self, track1
+    ):
+        from harpi.application.commands.handlers import _format_playing_duration
+
+        result = _format_playing_duration(track1, 30.0)
+        assert result == "00:30/60:00"
+
+    async def test_format_playing_duration_without_position(self, track1):
+        from harpi.application.commands.handlers import _format_playing_duration
+
+        result = _format_playing_duration(track1, None)
+        assert result == "60:00"
+
+    async def test_format_playing_duration_with_duration_none(self):
+        from harpi.application.commands.handlers import _format_playing_duration
+        from harpi.domain.track import Track, Source
+
+        track = Track(link="https://youtu.be/abc", source=Source.YOUTUBE)
+        result = _format_playing_duration(track, None)
+        assert result == "--:--"
+
 
 @pytest.mark.asyncio
 class TestRegistry:
@@ -117,18 +154,30 @@ class TestRegistry:
         from harpi.application.commands import get_handlers
 
         for name, handler in get_handlers().items():
-            assert callable(handler)
+            assert callable(handler.func)
 
     async def test_register_new_handler_after_import(self):
         from harpi.application.commands import register, get_handlers
 
-        @register("__test_only__")
+        @register("__test_only__", voice=False, guild_only=True)
         async def _test_handler(service, args: str) -> str:
             return "ok"
 
         handlers = get_handlers()
         assert "__test_only__" in handlers
-        assert callable(handlers["__test_only__"])
+        assert callable(handlers["__test_only__"].func)
+        assert handlers["__test_only__"].guild_only is True
+        assert handlers["__test_only__"].voice is False
+
+    async def test_register_with_voice_true(self):
+        from harpi.application.commands import register, get_handlers
+
+        @register("__voice_test__", voice=True, guild_only=False)
+        async def _voice_handler(service, args: str) -> str:
+            return "ok"
+
+        handlers = get_handlers()
+        assert handlers["__voice_test__"].voice is True
 
     async def test_register_includes_background_commands(self):
         from harpi.application.commands import get_handlers
@@ -136,6 +185,16 @@ class TestRegistry:
         handlers = get_handlers()
         assert "bg" in handlers
         assert "bgrm" in handlers
+
+    async def test_register_default_voice_is_false(self):
+        from harpi.application.commands import register, get_handlers
+
+        @register("__default_voice_test__")
+        async def _default_handler(service, args: str) -> str:
+            return "ok"
+
+        handlers = get_handlers()
+        assert handlers["__default_voice_test__"].voice is False
 
 
 @pytest.mark.asyncio
@@ -205,9 +264,25 @@ class TestQueueBackgroundEmbed:
 
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
-        assert "Músicas de fundo" in result.description
-        assert "0." in result.description
+        assert "\n\n**Músicas de fundo:**" in result.description
+        assert "0. Fake Track" in result.description
         assert "Fundo: 1" in result.footer
+
+    async def test_queue_bg_track_without_title_shows_fallback(
+        self, service: PlayerService
+    ):
+        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
+        from harpi.domain.track import Track, Source
+
+        await service.play("https://youtu.be/abc")
+        bg_track = Track(link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120, resolved=True)
+        service.queue.add_background_track(bg_track)
+
+        result = await handle_queue(service, "")
+        assert isinstance(result, EmbedData)
+        lines = result.description.split("\n")
+        assert any(line == "0. Desconhecida (02:00)" for line in lines)
 
     async def test_queue_shows_background_tracks_when_nothing_playing(
         self, service: PlayerService
@@ -219,5 +294,18 @@ class TestQueueBackgroundEmbed:
 
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
-        assert "Nada tocando no momento." in result.description
-        assert "Músicas de fundo" in result.description
+        assert "Nada tocando no momento.\n\n**Músicas de fundo:**\n0. Fake Track" in result.description
+
+    async def test_queue_shows_bg_track_without_title_fallback_when_nothing_playing(
+        self, service: PlayerService
+    ):
+        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands import EmbedData
+        from harpi.domain.track import Track, Source
+
+        bg_track = Track(link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120, resolved=True)
+        service.queue.add_background_track(bg_track)
+
+        result = await handle_queue(service, "")
+        assert isinstance(result, EmbedData)
+        assert "0. Desconhecida (02:00)" in result.description

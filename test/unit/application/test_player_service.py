@@ -16,6 +16,7 @@ class TestPlayerServicePlay:
         assert len(svc.queue.tracks) == 1
         assert svc.queue.get_current_track() == track1
         assert player.playing == track1
+        assert player.on_finish == svc.on_track_end
 
     @pytest.mark.asyncio
     async def test_play_enqueues_without_calling_play_when_already_playing(
@@ -169,6 +170,7 @@ class TestPlayerServiceOnTrackEnd:
         assert player.playing == track1
         await svc.on_track_end()
         assert player.playing == track2
+        assert player.on_finish == svc.on_track_end
 
     @pytest.mark.asyncio
     async def test_on_track_end_with_single_track_does_not_replay(self):
@@ -323,3 +325,177 @@ class TestPlayerServiceBackgroundRemove:
         await svc.add_background_track("https://youtu.be/abc")
         with pytest.raises(IndexError):
             svc.remove_background_track(5)
+
+
+class TestPlayerServiceDucking:
+    @pytest.mark.asyncio
+    async def test_play_ducks_background_when_nothing_playing(self, track1: Track):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        assert player.is_ducking is True
+        assert player.background_volume == player._duck_level
+
+    @pytest.mark.asyncio
+    async def test_play_does_not_duck_again_when_already_playing(self, track1: Track):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        assert player.is_ducking is True
+        player.background_volume = 0.8
+        await svc.play("https://youtu.be/def")
+        assert player.is_ducking is True
+        assert player.background_volume == 0.8
+
+    @pytest.mark.asyncio
+    async def test_on_track_end_unducks_when_queue_empty(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        assert player.is_ducking is True
+        await svc.on_track_end()
+        assert player.is_ducking is False
+
+    @pytest.mark.asyncio
+    async def test_on_track_end_does_not_unduck_when_more_tracks(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        await svc.play("https://youtu.be/def")
+        await svc.on_track_end()
+        assert player.is_ducking is True
+
+    @pytest.mark.asyncio
+    async def test_stop_unducks_background(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        assert player.is_ducking is True
+        await svc.stop()
+        assert player.is_ducking is False
+
+    @pytest.mark.asyncio
+    async def test_stop_on_empty_queue_does_not_crash(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.stop()
+        assert player.is_ducking is False
+
+    @pytest.mark.asyncio
+    async def test_skip_keeps_ducking_when_more_tracks(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/a")
+        await svc.play("https://youtu.be/b")
+        assert player.is_ducking is True
+        await svc.skip()
+        assert player.is_ducking is True
+
+    @pytest.mark.asyncio
+    async def test_skip_to_last_then_on_track_end_unducks(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/a")
+        await svc.play("https://youtu.be/b")
+        await svc.skip()
+        assert player.is_ducking is True
+        await svc.on_track_end()
+        assert player.is_ducking is False
+
+
+class TestPlayerServiceVolume:
+    @pytest.mark.asyncio
+    async def test_set_volume_delegates_to_player(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        svc.set_volume(0.5)
+        assert player.volume == 0.5
+
+    @pytest.mark.asyncio
+    async def test_set_volume_minimum(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        svc.set_volume(0.0)
+        assert player.volume == 0.0
+
+    @pytest.mark.asyncio
+    async def test_set_volume_maximum(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        svc.set_volume(1.0)
+        assert player.volume == 1.0
+
+    @pytest.mark.asyncio
+    async def test_set_volume_below_minimum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_volume(-0.1)
+
+    @pytest.mark.asyncio
+    async def test_set_volume_above_maximum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_volume(1.1)
+
+    @pytest.mark.asyncio
+    async def test_set_background_volume_delegates_to_player(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        svc.set_background_volume(0.3)
+        assert player.background_volume == 0.3
+
+    @pytest.mark.asyncio
+    async def test_set_background_volume_below_minimum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_background_volume(-0.1)
+
+    @pytest.mark.asyncio
+    async def test_set_background_volume_above_maximum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_background_volume(1.1)
+
+    @pytest.mark.asyncio
+    async def test_set_ducking_delegates_to_player(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        svc.set_ducking(0.1)
+        assert player._duck_level == 0.1
+
+    @pytest.mark.asyncio
+    async def test_set_ducking_below_minimum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_ducking(-0.1)
+
+    @pytest.mark.asyncio
+    async def test_set_ducking_above_maximum_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        with pytest.raises(ValueError):
+            svc.set_ducking(1.1)
