@@ -23,11 +23,24 @@ class Queue:
     def clear_tracks(self) -> None:
         self._queue.clear()
 
-    def set_background_tracks(self, tracks: list[Track]) -> None:
-        self._background: list[Track] = list(tracks)
+    def add_background_track(self, track: Track) -> None:
+        self._background.append(track)
+
+    def remove_background_track(self, track_or_index: Track | int) -> None:
+        if isinstance(track_or_index, int):
+            self._background.pop(track_or_index)
+        else:
+            self._background = [t for t in self._background if t != track_or_index]
 
     def clear_background_tracks(self) -> None:
         self._background.clear()
+
+    def next_background_track(self) -> Track | None:
+        if not self._background:
+            return None
+        track = self._background.pop(0)
+        self._background.append(track)
+        return track
 
     def get_current_track(self) -> Track | None:
         return self._queue[0] if self._queue else None

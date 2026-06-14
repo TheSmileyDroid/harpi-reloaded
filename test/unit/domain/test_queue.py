@@ -87,32 +87,85 @@ class TestQueueClearTracks:
 
 
 class TestQueueBackgroundTracks:
-    def test_sets_background_tracks_on_queue(
+    def test_adds_background_track(self, queue: Queue, track1: Track):
+        queue.add_background_track(track1)
+        assert len(queue.background_tracks) == 1
+        assert queue.background_tracks[0] == track1
+
+    def test_adds_multiple_background_tracks(
         self, queue: Queue, track1: Track, track2: Track
     ):
-        queue.set_background_tracks([track1, track2])
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
         assert len(queue.background_tracks) == 2
         assert queue.background_tracks[0] == track1
         assert queue.background_tracks[1] == track2
 
-    def test_clears_background_tracks_on_queue(
+    def test_removes_background_track_by_index(
         self, queue: Queue, track1: Track, track2: Track
     ):
-        queue.set_background_tracks([track1, track2])
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
+        queue.remove_background_track(0)
+        assert len(queue.background_tracks) == 1
+        assert queue.background_tracks[0] == track2
+
+    def test_removes_background_track_by_index_out_of_bounds(
+        self, queue: Queue, track1: Track
+    ):
+        queue.add_background_track(track1)
+        with pytest.raises(IndexError):
+            queue.remove_background_track(5)
+
+    def test_removes_background_track_by_index_negative(self, queue: Queue):
+        with pytest.raises(IndexError):
+            queue.remove_background_track(-1)
+
+    def test_removes_background_track_by_value(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
+        queue.remove_background_track(track1)
+        assert len(queue.background_tracks) == 1
+        assert queue.background_tracks[0] == track2
+
+    def test_removes_background_track_by_value_not_found(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
+        queue.add_background_track(track1)
+        queue.remove_background_track(track2)
+        assert len(queue.background_tracks) == 1
+        assert queue.background_tracks[0] == track1
+
+    def test_clears_background_tracks(self, queue: Queue, track1: Track, track2: Track):
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
         queue.clear_background_tracks()
         assert len(queue.background_tracks) == 0
-
-    def test_set_background_tracks_replaces_existing(
-        self, queue: Queue, track1: Track, track2: Track, track3: Track
-    ):
-        queue.set_background_tracks([track1])
-        queue.set_background_tracks([track2, track3])
-        assert len(queue.background_tracks) == 2
-        assert queue.background_tracks[0] == track2
 
     def test_background_starts_empty(self, queue: Queue):
         assert len(queue.background_tracks) == 0
         assert queue.background_tracks == []
+
+    def test_background_tracks_returns_copy(self, queue: Queue, track1: Track):
+        queue.add_background_track(track1)
+        bg = queue.background_tracks
+        bg.clear()
+        assert len(queue.background_tracks) == 1
+
+    def test_next_background_track_empty(self, queue: Queue):
+        assert queue.next_background_track() is None
+
+    def test_next_background_track_loops(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
+        assert queue.next_background_track() is track1
+        assert queue.next_background_track() is track2
+        assert queue.next_background_track() is track1
+        assert queue.next_background_track() is track2
 
 
 class TestQueueDefensiveCopy:
@@ -267,7 +320,8 @@ class TestQueueRemoveTrack:
     def test_remove_track_does_not_affect_background(
         self, queue: Queue, track1: Track, track2: Track
     ):
-        queue.set_background_tracks([track1, track2])
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
         queue.add_track([track1, track2])
         queue.remove_track(track1)
         assert len(queue.tracks) == 1

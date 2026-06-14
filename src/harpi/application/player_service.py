@@ -31,6 +31,13 @@ class PlayerService:
         if self._player.playing is None:
             await self._player.play(track, on_finish=self.on_track_end)
 
+    async def add_background_track(self, link: str) -> None:
+        track = await self._resolver.resolve(link)
+        self._queue.add_background_track(track)
+
+    def remove_background_track(self, index: int) -> None:
+        self._queue.remove_background_track(index)
+
     async def on_track_end(self) -> None:
         self._queue.skip_track()
         next_track = self._queue.get_current_track()

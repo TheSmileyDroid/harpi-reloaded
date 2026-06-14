@@ -270,3 +270,56 @@ class TestPlayerServiceWithFailingResolver:
 
         assert len(svc.queue.tracks) == 0
         assert player.playing is None
+
+
+class TestPlayerServiceBackgroundAdd:
+    @pytest.mark.asyncio
+    async def test_add_background_track_resolves_and_adds(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/abc")
+        assert len(svc.queue.background_tracks) == 1
+        assert svc.queue.background_tracks[0].link == "https://youtu.be/abc"
+
+    @pytest.mark.asyncio
+    async def test_add_background_track_does_not_affect_main_queue(self, track1: Track):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.play("https://youtu.be/abc")
+        await svc.add_background_track("https://youtu.be/def")
+        assert len(svc.queue.background_tracks) == 1
+        assert len(svc.queue.tracks) == 1
+        assert player.playing == track1
+
+    @pytest.mark.asyncio
+    async def test_add_background_track_failing_link_raises(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad link"))
+        with pytest.raises(InvalidLinkError):
+            await svc.add_background_track("https://youtu.be/bad")
+
+
+class TestPlayerServiceBackgroundRemove:
+    @pytest.mark.asyncio
+    async def test_remove_background_track_by_index(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/abc")
+        await svc.add_background_track("https://youtu.be/def")
+        svc.remove_background_track(0)
+        assert len(svc.queue.background_tracks) == 1
+        assert svc.queue.background_tracks[0].link == "https://youtu.be/def"
+
+    @pytest.mark.asyncio
+    async def test_remove_background_track_out_of_bounds(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/abc")
+        with pytest.raises(IndexError):
+            svc.remove_background_track(5)

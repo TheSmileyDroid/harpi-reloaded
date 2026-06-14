@@ -36,6 +36,31 @@ async def handle_stop(service: PlayerService, args: str) -> str:
     return "Fila limpa e música parada."
 
 
+@register("bg")
+async def handle_bg(service: PlayerService, args: str) -> str:
+    query = args.strip()
+    if not query:
+        return "A URL ou termo de busca não pode estar vazio."
+    await service.add_background_track(query)
+    return f"Música de fundo adicionada: {query}"
+
+
+@register("bgrm")
+async def handle_bgrm(service: PlayerService, args: str) -> str:
+    index_str = args.strip()
+    if not index_str:
+        return "Especifique o índice da música de fundo."
+    try:
+        index = int(index_str)
+    except ValueError:
+        return "O índice deve ser um número."
+    try:
+        service.remove_background_track(index)
+        return f"Música de fundo {index} removida."
+    except IndexError:
+        return f"Índice {index} inválido."
+
+
 def _format_duration(seconds: int | None) -> str:
     if seconds is None:
         return "--:--"
@@ -54,13 +79,23 @@ def _format_playing_duration(current: Track, position: float | None) -> str:
 def _build_queue_embed(service: PlayerService) -> str | EmbedData:
     current = service.playing
     tracks = service.queue.tracks
+    bg_tracks = service.queue.background_tracks
     loop = service.queue.loop_mode.value
     total = len(tracks)
+    footer_bg = f" | Fundo: {len(bg_tracks)}" if bg_tracks else ""
 
     if current is None:
+        description = "Nada tocando no momento."
+        if bg_tracks:
+            bg_lines = ["", "**Músicas de fundo:**"]
+            for i, t in enumerate(bg_tracks):
+                td = _format_duration(t.duration)
+                title = t.title or "Desconhecida"
+                bg_lines.append(f"{i}. {title} ({td})")
+            description = "\n".join([description] + bg_lines)
         return EmbedData(
-            description="Nada tocando no momento.",
-            footer=f"Fila: {total} músicas | Loop: {loop}",
+            description=description,
+            footer=f"Fila: {total} músicas{footer_bg} | Loop: {loop}",
         )
 
     duration = _format_playing_duration(current, service.position)
@@ -72,9 +107,17 @@ def _build_queue_embed(service: PlayerService) -> str | EmbedData:
         title = t.title or "Desconhecida"
         lines.append(f"{i}. {title} ({td})")
 
+    if bg_tracks:
+        lines.append("")
+        lines.append("**Músicas de fundo:**")
+        for i, t in enumerate(bg_tracks):
+            td = _format_duration(t.duration)
+            title = t.title or "Desconhecida"
+            lines.append(f"{i}. {title} ({td})")
+
     return EmbedData(
         description="\n".join(lines),
-        footer=f"Total: {total} músicas | Loop: {loop}",
+        footer=f"Total: {total} músicas{footer_bg} | Loop: {loop}",
     )
 
 
