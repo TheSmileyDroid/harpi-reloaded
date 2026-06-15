@@ -46,6 +46,31 @@ class HarpiBot:
             return None
         return await self._router.dispatch(content)
 
+    async def _ensure_voice_connection(self, message) -> str | None:
+        guild_id = message.guild.id if message.guild else 0
+        player = self._guild_players.get(guild_id)
+        if player is not None and player.is_connected:
+            return None
+        if not message.author.voice:
+            return "Você precisa estar em um canal de voz."
+        player = self._guild_players.get(guild_id)
+        if player is None:
+            return None
+        channel = message.author.voice.channel
+        existing = message.guild.voice_client
+        if existing is not None:
+            player.set_voice_client(existing)
+            if existing.channel != channel:
+                await existing.move_to(channel)
+        else:
+            logger.info(
+                "Joining voice channel %s in guild %s",
+                channel.name,
+                message.guild,
+            )
+            await player.connect(channel)
+        return None
+
     async def handle_discord_message(self, message) -> str | EmbedData | None:
         if message.author.bot:
             return None
@@ -61,30 +86,14 @@ class HarpiBot:
             else ""
         )
 
-        if cmd == "play":
-            player = self._guild_players.get(guild_id)
-            if player is None or not player.is_connected:
-                if not message.author.voice:
-                    return "Você precisa estar em um canal de voz."
-                router = self._ensure_guild_state(guild_id)
-                player = self._guild_players[guild_id]
-                channel = message.author.voice.channel
-                existing = message.guild.voice_client
-                if existing is not None:
-                    player.set_voice_client(existing)
-                    if existing.channel != channel:
-                        await existing.move_to(channel)
-                else:
-                    logger.info(
-                        "Joining voice channel %s in guild %s",
-                        channel.name,
-                        message.guild,
-                    )
-                    await player.connect(channel)
-
         router = self._ensure_guild_state(guild_id)
         if router is None:
             return None
+
+        if cmd and router.needs_voice(cmd):
+            error = await self._ensure_voice_connection(message)
+            if error is not None:
+                return error
 
         try:
             return await router.dispatch(content)

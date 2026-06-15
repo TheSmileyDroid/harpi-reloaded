@@ -54,6 +54,10 @@ class CommandRouter:
             logger.exception("Error executing command %s", cmd_name)
             return f"Erro: {e}"
 
+    def needs_voice(self, cmd_name: str) -> bool:
+        handler = self._handlers.get(cmd_name)
+        return handler is not None and handler.voice
+
     def _help(self) -> str:
         cmds = ", ".join(f"{self._prefix}{c}" for c in self._handlers)
         return f"Comandos disponíveis: {cmds}. Exemplo: {self._prefix}play <url>"
