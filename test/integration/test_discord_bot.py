@@ -133,6 +133,12 @@ class _FakePlayerWithConnection:
         self.is_stopped = True
         self.is_paused = False
 
+    async def add_background_source(self, track: Any) -> None:
+        self.background_tracks.append(track)
+
+    def remove_background_source(self, index: int) -> Any:
+        return self.background_tracks.pop(index)
+
 
 @pytest.fixture
 def bot():

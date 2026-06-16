@@ -35,9 +35,11 @@ class PlayerService:
     async def add_background_track(self, link: str) -> None:
         track = await self._resolver.resolve(link)
         self._queue.add_background_track(track)
+        await self._player.add_background_source(track)
 
     def remove_background_track(self, index: int) -> None:
         self._queue.remove_background_track(index)
+        self._player.remove_background_source(index)
 
     async def set_background_tracks(self, links: list[str]) -> tuple[int, int]:
         resolved: list[Track] = []
@@ -50,7 +52,12 @@ class PlayerService:
                 failed += 1
         if not resolved:
             return 0, failed
+        old_count = len(self._queue.background_tracks)
         self._queue.set_background_tracks(resolved)
+        for i in range(old_count - 1, -1, -1):
+            self._player.remove_background_source(i)
+        for track in resolved:
+            await self._player.add_background_source(track)
         return len(resolved), failed
 
     async def on_track_end(self) -> None:

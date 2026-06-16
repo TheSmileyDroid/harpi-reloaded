@@ -1,10 +1,15 @@
+from typing import Any
 import pytest
 from harpi.application.ports.audio import AudioPlayerProtocol
 from harpi.domain.track import Track, Source
 
 
 class FakeAudioSource:
-    pass
+    def cleanup(self) -> None:
+        pass
+
+
+
 
 
 class FakeVoiceClient:
@@ -45,18 +50,14 @@ def voice_client():
 
 
 @pytest.fixture
-def source_factory():
-    async def factory(track: Track) -> FakeAudioSource:
-        return FakeAudioSource()
-
-    return factory
-
-
-@pytest.fixture
-def player(voice_client, source_factory):
+def player(voice_client):
     from harpi.infrastructure.discord_player import DiscordPlayer
 
-    return DiscordPlayer(voice_client=voice_client, source_factory=source_factory)
+    class TestDiscordPlayer(DiscordPlayer):
+        async def _build_mixed_source(self, track: Track) -> Any:
+            return FakeAudioSource()
+
+    return TestDiscordPlayer(voice_client=voice_client)
 
 
 @pytest.fixture
@@ -65,6 +66,16 @@ def track():
         link="https://youtu.be/abc123",
         title="Test Track",
         duration=120,
+        source=Source.YOUTUBE,
+    )
+
+
+@pytest.fixture
+def bg_track():
+    return Track(
+        link="https://youtu.be/bg123",
+        title="BG Track",
+        duration=300,
         source=Source.YOUTUBE,
     )
 
@@ -182,17 +193,16 @@ class TestDiscordPlayerErrors:
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.play(track)
 
-    async def test_play_raises_when_source_factory_fails(
+    async def test_play_raises_when_build_mixed_source_fails(
         self, voice_client, track: Track
     ):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
-        async def failing_factory(_track: Track):
-            raise ValueError("No audio stream available")
+        class FailingDiscordPlayer(DiscordPlayer):
+            async def _build_mixed_source(self, track: Track) -> Any:
+                raise ValueError("No audio stream available")
 
-        player = DiscordPlayer(
-            voice_client=voice_client, source_factory=failing_factory
-        )
+        player = FailingDiscordPlayer(voice_client=voice_client)
 
         with pytest.raises(ValueError, match="No audio stream available"):
             await player.play(track)
@@ -220,3 +230,45 @@ class TestDiscordPlayerErrors:
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.stop()
+
+
+class TestDiscordPlayerBackgroundSource:
+    async def test_add_background_source_adds_to_list(
+        self, player, bg_track: Track
+    ):
+        await player.add_background_source(bg_track)
+        assert len(player.background_tracks) == 1
+        assert player.background_tracks[0] is bg_track
+
+    async def test_add_background_source_multiple(
+        self, player, bg_track: Track
+    ):
+        await player.add_background_source(bg_track)
+        await player.add_background_source(bg_track)
+        assert len(player.background_tracks) == 2
+
+    async def test_remove_background_source_removes_from_tracks(
+        self, player, bg_track: Track
+    ):
+        player.background_tracks = [bg_track]
+        player.remove_background_source(0)
+        assert len(player.background_tracks) == 0
+
+    async def test_remove_background_source_out_of_bounds_raises(
+        self, player
+    ):
+        with pytest.raises(IndexError):
+            player.remove_background_source(5)
+
+    async def test_add_background_source_before_play_starts(
+        self, player, bg_track: Track, track: Track
+    ):
+        await player.add_background_source(bg_track)
+        assert len(player.background_tracks) == 1
+        await player.play(track)
+        assert player.playing is track
+
+
+class TestDiscordPlayerStopNoCrash:
+    async def test_stop_without_playing_does_not_crash(self, player):
+        await player.stop()

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import subprocess
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -9,6 +10,7 @@ from pytubefix.async_youtube import AsyncYouTube
 
 from harpi.application.ports.audio import AudioPlayerProtocol
 from harpi.domain.track import Track
+from harpi.infrastructure.mixed_audio_source import MixedAudioSource
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.volume: float = 1.0
         self.background_volume: float = 0.5
         self.is_ducking: bool = False
+        self._mixed_source: MixedAudioSource | None = None
 
     @property
     def playing(self) -> Track | None:
@@ -72,7 +75,9 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.is_paused = False
         logger.info("Playing %s (%s)", track.title, track.link)
         try:
-            source = await self._source_factory(track)
+            source = await self._build_mixed_source(track)
+            if self._mixed_source is None:
+                self._mixed_source = source
             self._voice_client.play(source, after=lambda e: self._on_finish(e))
         except Exception:
             logger.exception("Failed to create audio source for %s", track.link)
@@ -99,11 +104,73 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._check_connected()
         logger.info("Stopping playback")
         self._voice_client.stop()
+        if self._mixed_source is not None:
+            self._mixed_source.cleanup()
+            self._mixed_source = None
         self._current = None
         self._start_time = None
         self._paused_position = None
         self.is_stopped = True
         self.is_paused = False
+
+    async def _build_mixed_source(self, track: Track) -> MixedAudioSource:
+        fg_url = await self._resolve_url(track)
+        fg_proc = subprocess.Popen(
+            ["ffmpeg", "-i", fg_url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        procs = [fg_proc]
+        vols = [self.volume]
+        for bg in self.background_tracks:
+            try:
+                url = await self._resolve_url(bg)
+                proc = subprocess.Popen(
+                    ["ffmpeg", "-i", url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                procs.append(proc)
+                vols.append(self.background_volume)
+            except Exception:
+                logger.warning("Failed to resolve background track %s", bg.link)
+        source = MixedAudioSource(procs, vols)
+        self._mixed_source = source
+        return source
+
+    @staticmethod
+    async def _resolve_url(track: Track) -> str:
+        yt = AsyncYouTube(track.link)
+        streams = await yt.streams()
+        stream = streams.get_audio_only()
+        if stream is None:
+            raise ValueError(f"No audio stream available for {track.link}")
+        return stream.url
+
+    async def add_background_source(self, track: Track) -> None:
+        self.background_tracks.append(track)
+        if self._mixed_source is not None:
+            try:
+                url = await self._resolve_url(track)
+                proc = subprocess.Popen(
+                    ["ffmpeg", "-i", url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                self._mixed_source.add_source(proc, self.background_volume)
+            except Exception:
+                logger.warning("Failed to add background source for %s", track.link)
+
+    def remove_background_source(self, index: int) -> Track:
+        removed = self.background_tracks.pop(index)
+        if self._mixed_source is not None:
+            proc = self._mixed_source.remove_source(index)
+            try:
+                proc.kill()
+                proc.wait(timeout=1)
+            except Exception:
+                pass
+        return removed
 
     def _on_finish(self, error: Exception | None) -> None:
         if error:
@@ -167,14 +234,10 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     @staticmethod
     async def _default_source_factory(track: Track) -> Any:
-        yt = AsyncYouTube(track.link)
-        streams = await yt.streams()
-        stream = streams.get_audio_only()
-        if stream is None:
-            raise ValueError(f"No audio stream available for {track.link}")
         import discord
 
+        url = await DiscordPlayer._resolve_url(track)
         return discord.FFmpegPCMAudio(
-            stream.url,
+            url,
             before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
         )

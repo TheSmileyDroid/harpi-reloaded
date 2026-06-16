@@ -100,6 +100,12 @@ class FakePlayer(AudioPlayerProtocol):
             self._saved_background_volume = None
         self.is_ducking = False
 
+    async def add_background_source(self, track: Track) -> None:
+        self.background_tracks.append(track)
+
+    def remove_background_source(self, index: int) -> Track:
+        return self.background_tracks.pop(index)
+
 
 @pytest.fixture
 def fake_resolver():

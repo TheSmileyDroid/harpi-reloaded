@@ -560,3 +560,32 @@ class TestPlayerServiceVolume:
         svc = PlayerService(resolver=resolver, player=player)
         with pytest.raises(ValueError):
             svc.set_ducking(1.1)
+
+
+class TestPlayerServiceBackgroundDelegation:
+    @pytest.mark.asyncio
+    async def test_add_background_track_calls_player_add_source(self, track1):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/abc")
+        assert len(player.background_tracks) == 1
+        assert player.background_tracks[0] == track1
+
+    @pytest.mark.asyncio
+    async def test_remove_background_track_calls_player_remove_source(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/abc")
+        svc.remove_background_track(0)
+        assert len(svc.queue.background_tracks) == 0
+
+    @pytest.mark.asyncio
+    async def test_set_background_tracks_replaces_player_sources(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/old")
+        await svc.set_background_tracks(["https://youtu.be/new1", "https://youtu.be/new2"])
+        assert len(player.background_tracks) == 2
