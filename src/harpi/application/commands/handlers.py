@@ -38,6 +38,18 @@ async def handle_stop(service: PlayerService, args: str) -> str:
 
 @register("bg", guild_only=True, voice=True)
 async def handle_bg(service: PlayerService, args: str) -> str:
+    links = args.strip().split()
+    if not links:
+        return "Especifique ao menos uma URL ou termo de busca."
+    succeeded, failed = await service.set_background_tracks(links)
+    msg = f"Músicas de fundo substituídas: {succeeded} adicionadas."
+    if failed:
+        msg += f" {failed} falha(s) ignorada(s)."
+    return msg
+
+
+@register("bgadd", guild_only=True, voice=True)
+async def handle_bgadd(service: PlayerService, args: str) -> str:
     query = args.strip()
     if not query:
         return "A URL ou termo de busca não pode estar vazio."

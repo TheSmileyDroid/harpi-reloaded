@@ -327,6 +327,67 @@ class TestPlayerServiceBackgroundRemove:
             svc.remove_background_track(5)
 
 
+class TestPlayerServiceBackgroundSet:
+    @pytest.mark.asyncio
+    async def test_set_background_tracks_replaces_all(self, track1: Track):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/old")
+        await svc.play("https://youtu.be/abc")
+        succeeded, failed = await svc.set_background_tracks(
+            ["https://youtu.be/x", "https://youtu.be/y"]
+        )
+        assert succeeded == 2
+        assert failed == 0
+        assert len(svc.queue.background_tracks) == 2
+        assert len(svc.queue.tracks) == 1
+        assert svc.queue.get_current_track() == track1
+
+    @pytest.mark.asyncio
+    async def test_set_background_tracks_partial_failure(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad link"))
+        await svc.add_background_track("https://youtu.be/old")
+        succeeded, failed = await svc.set_background_tracks(
+            ["https://youtu.be/bad", "https://youtu.be/good"]
+        )
+        assert succeeded == 1
+        assert failed == 1
+        assert len(svc.queue.background_tracks) == 1
+
+    @pytest.mark.asyncio
+    async def test_set_background_tracks_all_fail_preserves_original(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/original")
+        resolver.set_failure("https://youtu.be/bad1", InvalidLinkError("Bad"))
+        resolver.set_failure("https://youtu.be/bad2", InvalidLinkError("Bad"))
+        succeeded, failed = await svc.set_background_tracks(
+            ["https://youtu.be/bad1", "https://youtu.be/bad2"]
+        )
+        assert succeeded == 0
+        assert failed == 2
+        assert len(svc.queue.background_tracks) == 1
+        assert svc.queue.background_tracks[0].link == "https://youtu.be/original"
+
+
+class TestPlayerServiceBackgroundIsolation:
+    @pytest.mark.asyncio
+    async def test_on_track_end_preserves_background(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/bg")
+        await svc.play("https://youtu.be/abc")
+        await svc.on_track_end()
+        assert len(svc.queue.background_tracks) == 1
+        assert svc.queue.background_tracks[0].link == "https://youtu.be/bg"
+
+
 class TestPlayerServiceDucking:
     @pytest.mark.asyncio
     async def test_play_ducks_background_when_nothing_playing(self, track1: Track):

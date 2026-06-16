@@ -167,6 +167,23 @@ class TestQueueBackgroundTracks:
         assert queue.next_background_track() is track1
         assert queue.next_background_track() is track2
 
+    def test_set_background_tracks_replaces_all(
+        self, queue: Queue, track1: Track, track2: Track, track3: Track
+    ):
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
+        queue.set_background_tracks([track3])
+        assert len(queue.background_tracks) == 1
+        assert queue.background_tracks[0] == track3
+
+    def test_set_background_tracks_empty_clears(
+        self, queue: Queue, track1: Track, track2: Track
+    ):
+        queue.add_background_track(track1)
+        queue.add_background_track(track2)
+        queue.set_background_tracks([])
+        assert len(queue.background_tracks) == 0
+
 
 class TestQueueDefensiveCopy:
     def test_tracks_returns_copy(self, queue: Queue, track1: Track, track2: Track):

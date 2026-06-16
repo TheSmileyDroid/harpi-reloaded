@@ -32,6 +32,9 @@ class Queue:
         else:
             self._background = [t for t in self._background if t != track_or_index]
 
+    def set_background_tracks(self, tracks: list[Track]) -> None:
+        self._background = list(tracks)
+
     def clear_background_tracks(self) -> None:
         self._background.clear()
 

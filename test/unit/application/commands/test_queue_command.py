@@ -2,6 +2,7 @@ import pytest
 from harpi.application.player_service import PlayerService
 from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.application.ports.audio import AudioResolverProtocol
+from harpi.application.exceptions import InvalidLinkError
 from harpi.domain.track import Track, Source
 
 
@@ -184,6 +185,7 @@ class TestRegistry:
 
         handlers = get_handlers()
         assert "bg" in handlers
+        assert "bgadd" in handlers
         assert "bgrm" in handlers
 
     async def test_register_default_voice_is_false(self):
@@ -199,18 +201,44 @@ class TestRegistry:
 
 @pytest.mark.asyncio
 class TestBackgroundCommands:
-    async def test_bg_add_handler(self, service: PlayerService):
+    async def test_bg_replaces_all_with_multiple_links(
+        self, service: PlayerService
+    ):
         from harpi.application.commands.handlers import handle_bg
 
-        result = await handle_bg(service, "https://youtu.be/abc")
+        await service.add_background_track("https://youtu.be/old")
+        result = await handle_bg(service, "https://youtu.be/a https://youtu.be/b")
         assert isinstance(result, str)
-        assert len(service.queue.background_tracks) == 1
-        assert service.queue.background_tracks[0].link == "https://youtu.be/abc"
+        assert "2" in result
+        assert len(service.queue.background_tracks) == 2
 
-    async def test_bg_add_empty_args_returns_error(self, service: PlayerService):
+    async def test_bg_partial_failure_shows_count(self):
         from harpi.application.commands.handlers import handle_bg
 
-        result = await handle_bg(service, "")
+        resolver = FakeResolver()
+        resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad"))
+        svc = PlayerService(resolver=resolver, player=FakePlayer())
+        await svc.add_background_track("https://youtu.be/old")
+        result = await handle_bg(svc, "https://youtu.be/bad https://youtu.be/good")
+        assert isinstance(result, str)
+        assert "1 adicionada" in result
+        assert "1 falha" in result
+        assert len(svc.queue.background_tracks) == 1
+        assert svc.queue.background_tracks[0].link == "https://youtu.be/good"
+
+    async def test_bgadd_handler(self, service: PlayerService):
+        from harpi.application.commands.handlers import handle_bgadd
+
+        await service.add_background_track("https://youtu.be/old")
+        result = await handle_bgadd(service, "https://youtu.be/new")
+        assert isinstance(result, str)
+        assert len(service.queue.background_tracks) == 2
+        assert service.queue.background_tracks[1].link == "https://youtu.be/new"
+
+    async def test_bgadd_empty_args_returns_error(self, service: PlayerService):
+        from harpi.application.commands.handlers import handle_bgadd
+
+        result = await handle_bgadd(service, "")
         assert isinstance(result, str)
         assert "vazio" in result
 

@@ -170,3 +170,6 @@ src/harpi/
 - `FakePlayer.is_paused` / `FakePlayer.is_stopped` — boolean flags
 - `FakePlayer.background_tracks` — list of background tracks
 - All player methods are async (`play`, `pause`, `resume`, `stop`)
+
+## Linear Tasks
+Check current linear task for project harpi-reloaded-5482169455d9 (Harpi Reloaded) on linear MCP to get the current context. You can also check the other tasks.
