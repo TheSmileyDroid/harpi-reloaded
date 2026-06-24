@@ -1,7 +1,7 @@
 from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.domain.queue import LoopMode
 from harpi.application.player_service import PlayerService
-from harpi.application.exceptions import InvalidLinkError, NetworkError, TimeoutError
+from harpi.application.exceptions import InvalidLinkError, NetworkError, ResolutionTimeoutError
 import pytest
 from harpi.domain.track import Track
 
@@ -252,9 +252,9 @@ class TestPlayerServiceWithFailingResolver:
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
-        resolver.set_failure("https://youtu.be/slow", TimeoutError("Timed out"))
+        resolver.set_failure("https://youtu.be/slow", ResolutionTimeoutError("Timed out"))
 
-        with pytest.raises(TimeoutError):
+        with pytest.raises(ResolutionTimeoutError):
             await svc.play("https://youtu.be/slow")
 
         assert len(svc.queue.tracks) == 0

@@ -80,11 +80,6 @@ class TestQueueClearTracks:
         assert len(queue.tracks) == 1
         assert queue.get_current_track() == track1
 
-    def test_clear_method_also_clears(self, queue: Queue, track1: Track):
-        queue.add_track(track1)
-        queue.clear()
-        assert len(queue.tracks) == 0
-
 
 class TestQueueBackgroundTracks:
     def test_adds_background_track(self, queue: Queue, track1: Track):

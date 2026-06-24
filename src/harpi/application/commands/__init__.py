@@ -10,7 +10,7 @@ class EmbedData:
     footer: str = ""
 
 
-@dataclass
+@dataclass(frozen=True)
 class CommandHandler:
     func: Callable[[PlayerService, str], Awaitable[str | EmbedData]]
     guild_only: bool = False

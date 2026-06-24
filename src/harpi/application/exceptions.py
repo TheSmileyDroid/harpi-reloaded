@@ -10,5 +10,5 @@ class NetworkError(ResolutionError):
     """Raised when a network error occurs during resolution."""
 
 
-class TimeoutError(ResolutionError):
+class ResolutionTimeoutError(ResolutionError):
     """Raised when resolution times out."""

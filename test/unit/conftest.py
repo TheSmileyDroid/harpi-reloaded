@@ -1,7 +1,7 @@
 import pytest
 from collections.abc import Callable, Coroutine
 from typing import Any
-from harpi.domain.track import Track, Source
+from harpi.domain.track import Track, Source, validate_volume
 from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProtocol
 
 
@@ -46,6 +46,10 @@ class FakePlayer(AudioPlayerProtocol):
     def position(self) -> float | None:
         return self._position
 
+    @property
+    def is_connected(self) -> bool:
+        return True
+
     async def play(
         self,
         track: Track,
@@ -67,22 +71,15 @@ class FakePlayer(AudioPlayerProtocol):
         self.is_stopped = True
 
     def set_volume(self, volume: float) -> None:
-        if not 0.0 <= volume <= 1.0:
-            raise ValueError(f"Volume must be between 0.0 and 1.0, got {volume}")
+        validate_volume(volume, "Volume")
         self.volume = volume
 
     def set_background_volume(self, volume: float) -> None:
-        if not 0.0 <= volume <= 1.0:
-            raise ValueError(
-                f"Background volume must be between 0.0 and 1.0, got {volume}"
-            )
+        validate_volume(volume, "Background volume")
         self.background_volume = volume
 
     def set_ducking(self, duck_level: float) -> None:
-        if not 0.0 <= duck_level <= 1.0:
-            raise ValueError(
-                f"Duck level must be between 0.0 and 1.0, got {duck_level}"
-            )
+        validate_volume(duck_level, "Duck level")
         self._duck_level = duck_level
 
     async def duck(self) -> None:

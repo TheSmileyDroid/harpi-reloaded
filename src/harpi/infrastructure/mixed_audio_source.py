@@ -3,6 +3,8 @@ from typing import Any
 import numpy as np
 import discord
 
+from harpi.domain.track import validate_volume
+
 PCM_FRAME_SIZE: int = 960
 
 
@@ -15,8 +17,7 @@ class MixedAudioSource(discord.AudioSource):
         self._processes = list(processes)
         self._volumes = list(volumes)
         for v in volumes:
-            if not 0.0 <= v <= 1.0:
-                raise ValueError(f"Volume must be between 0.0 and 1.0, got {v}")
+            validate_volume(v, "Volume")
 
     def read(self) -> bytes:
         arrays = []
@@ -51,6 +52,7 @@ class MixedAudioSource(discord.AudioSource):
         return proc
 
     def set_volume(self, index: int, volume: float) -> None:
+        validate_volume(volume, "Volume")
         self._volumes[index] = volume
 
     def cleanup(self) -> None:

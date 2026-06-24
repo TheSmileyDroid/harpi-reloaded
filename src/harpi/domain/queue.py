@@ -79,6 +79,3 @@ class Queue:
     @property
     def background_tracks(self) -> list[Track]:
         return list(self._background)
-
-    def clear(self) -> None:
-        self._queue.clear()

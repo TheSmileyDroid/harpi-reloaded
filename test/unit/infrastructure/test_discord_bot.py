@@ -167,7 +167,6 @@ def _inject_guild_state(
     return player, router
 
 
-@pytest.mark.integration
 class TestHarpiBotMessageHandling:
     @pytest.mark.asyncio
     async def test_play_command_responds(self, bot: HarpiBot):
@@ -237,7 +236,6 @@ class TestHarpiBotMessageHandling:
         assert "error" in msg or "erro" in msg
 
 
-@pytest.mark.integration
 class TestHarpiBotVoiceConnection:
     @pytest.mark.asyncio
     async def test_play_without_voice_returns_error(self):
@@ -306,7 +304,6 @@ class TestHarpiBotVoiceConnection:
         assert player.connected_channel is None
 
 
-@pytest.mark.integration
 class TestHarpiBotCustomTokenAndPrefix:
     @pytest.mark.asyncio
     async def test_custom_prefix(self):

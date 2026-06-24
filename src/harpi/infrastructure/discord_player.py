@@ -9,7 +9,7 @@ from typing import Any
 from pytubefix.async_youtube import AsyncYouTube
 
 from harpi.application.ports.audio import AudioPlayerProtocol
-from harpi.domain.track import Track
+from harpi.domain.track import Track, validate_volume
 from harpi.infrastructure.mixed_audio_source import MixedAudioSource
 
 logger = logging.getLogger(__name__)
@@ -19,10 +19,8 @@ class DiscordPlayer(AudioPlayerProtocol):
     def __init__(
         self,
         voice_client: Any = None,
-        source_factory: Callable[[Track], Coroutine[Any, Any, Any]] | None = None,
     ):
         self._voice_client = voice_client
-        self._source_factory = source_factory or self._default_source_factory
         self._current: Track | None = None
         self._start_time: float | None = None
         self._paused_position: float | None = None
@@ -183,24 +181,17 @@ class DiscordPlayer(AudioPlayerProtocol):
             asyncio.run_coroutine_threadsafe(self._on_finish_callback(), self._loop)
 
     def set_volume(self, volume: float) -> None:
-        if not 0.0 <= volume <= 1.0:
-            raise ValueError(f"Volume must be between 0.0 and 1.0, got {volume}")
+        validate_volume(volume, "Volume")
         self.volume = volume
         logger.info("Volume set to %s", volume)
 
     def set_background_volume(self, volume: float) -> None:
-        if not 0.0 <= volume <= 1.0:
-            raise ValueError(
-                f"Background volume must be between 0.0 and 1.0, got {volume}"
-            )
+        validate_volume(volume, "Background volume")
         self.background_volume = volume
         logger.info("Background volume set to %s", volume)
 
     def set_ducking(self, duck_level: float) -> None:
-        if not 0.0 <= duck_level <= 1.0:
-            raise ValueError(
-                f"Duck level must be between 0.0 and 1.0, got {duck_level}"
-            )
+        validate_volume(duck_level, "Duck level")
         self._duck_level = duck_level
         logger.info("Duck level set to %s", duck_level)
 
@@ -231,13 +222,3 @@ class DiscordPlayer(AudioPlayerProtocol):
         logger.info("Connected to voice channel %s", channel.name)
         self.is_stopped = True
         self.is_paused = False
-
-    @staticmethod
-    async def _default_source_factory(track: Track) -> Any:
-        import discord
-
-        url = await DiscordPlayer._resolve_url(track)
-        return discord.FFmpegPCMAudio(
-            url,
-            before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-        )

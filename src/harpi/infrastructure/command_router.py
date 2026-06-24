@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Awaitable, Callable
 
 from harpi.application.player_service import PlayerService
 from harpi.application.commands import get_handlers, Response, CommandHandler
@@ -19,12 +18,6 @@ class CommandRouter:
             len(self._handlers),
             ", ".join(self._handlers),
         )
-
-    def _wrap(self, handler: CommandHandler) -> Callable[[str], Awaitable[Response]]:
-        async def wrapped(args: str) -> Response:
-            return await handler.func(self._player_service, args)
-
-        return wrapped
 
     async def dispatch(self, message: str) -> Response | None:
         if not message:

@@ -79,7 +79,7 @@ class PlayerService:
         await self.on_track_end()
 
     async def stop(self) -> None:
-        self._queue.clear()
+        self._queue.clear_tracks()
         await self._player.stop()
         await self._player.unduck()
 
