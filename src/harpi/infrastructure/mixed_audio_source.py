@@ -2,10 +2,11 @@ from typing import Any
 
 import numpy as np
 import discord
+from discord.opus import Encoder
 
 from harpi.domain.track import validate_volume
 
-PCM_FRAME_SIZE: int = 960
+PCM_FRAME_SIZE: int = Encoder.FRAME_SIZE
 
 
 class MixedAudioSource(discord.AudioSource):

@@ -64,6 +64,9 @@ class DiscordPlayer(AudioPlayerProtocol):
         on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
         self._check_connected()
+        if self._mixed_source is not None:
+            self._mixed_source.cleanup()
+            self._mixed_source = None
         self._current = track
         self._start_time = time.monotonic()
         self._paused_position = None
@@ -74,8 +77,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         logger.info("Playing %s (%s)", track.title, track.link)
         try:
             source = await self._build_mixed_source(track)
-            if self._mixed_source is None:
-                self._mixed_source = source
+            self._mixed_source = source
             self._voice_client.play(source, after=lambda e: self._on_finish(e))
         except Exception:
             logger.exception("Failed to create audio source for %s", track.link)
@@ -114,7 +116,14 @@ class DiscordPlayer(AudioPlayerProtocol):
     async def _build_mixed_source(self, track: Track) -> MixedAudioSource:
         fg_url = await self._resolve_url(track)
         fg_proc = subprocess.Popen(
-            ["ffmpeg", "-i", fg_url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+            [
+                "ffmpeg",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "5",
+                "-i", fg_url,
+                "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
@@ -124,7 +133,14 @@ class DiscordPlayer(AudioPlayerProtocol):
             try:
                 url = await self._resolve_url(bg)
                 proc = subprocess.Popen(
-                    ["ffmpeg", "-i", url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+                    [
+                        "ffmpeg",
+                        "-reconnect", "1",
+                        "-reconnect_streamed", "1",
+                        "-reconnect_delay_max", "5",
+                        "-i", url,
+                        "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
                 )
@@ -132,9 +148,7 @@ class DiscordPlayer(AudioPlayerProtocol):
                 vols.append(self.background_volume)
             except Exception:
                 logger.warning("Failed to resolve background track %s", bg.link)
-        source = MixedAudioSource(procs, vols)
-        self._mixed_source = source
-        return source
+        return MixedAudioSource(procs, vols)
 
     @staticmethod
     async def _resolve_url(track: Track) -> str:
@@ -151,7 +165,14 @@ class DiscordPlayer(AudioPlayerProtocol):
             try:
                 url = await self._resolve_url(track)
                 proc = subprocess.Popen(
-                    ["ffmpeg", "-i", url, "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+                    [
+                        "ffmpeg",
+                        "-reconnect", "1",
+                        "-reconnect_streamed", "1",
+                        "-reconnect_delay_max", "5",
+                        "-i", url,
+                        "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
                 )
@@ -175,6 +196,9 @@ class DiscordPlayer(AudioPlayerProtocol):
             logger.error("Playback finished with error: %s", error)
         else:
             logger.info("Playback finished")
+        if self._mixed_source is not None:
+            self._mixed_source.cleanup()
+            self._mixed_source = None
         self._current = None
         self._start_time = None
         if self._on_finish_callback is not None and self._loop is not None:
