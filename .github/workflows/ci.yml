@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: Lint + TypeCheck + Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Lint
+        run: uv run ruff check src/ test/
+
+      - name: Type check
+        run: uv run ty check src/harpi/ test/ main.py
+
+      - name: Unit tests
+        run: uv run pytest test/unit/ -v
+
+  integration-e2e:
+    name: Integration + E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Integration tests
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
+          TEST_VOICE_CHANNEL_ID: ${{ secrets.TEST_VOICE_CHANNEL_ID }}
+        run: uv run pytest test/integration/ -v -m integration
+
+      - name: E2E tests
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
+          TEST_VOICE_CHANNEL_ID: ${{ secrets.TEST_VOICE_CHANNEL_ID }}
+        run: uv run pytest test/e2e/ -v -m e2e
