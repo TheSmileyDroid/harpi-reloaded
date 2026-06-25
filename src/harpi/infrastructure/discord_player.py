@@ -152,7 +152,7 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     @staticmethod
     async def _resolve_url(track: Track) -> str:
-        yt = AsyncYouTube(track.link)
+        yt = AsyncYouTube(track.link, "WEB")
         streams = await yt.streams()
         stream = streams.get_audio_only()
         if stream is None:
