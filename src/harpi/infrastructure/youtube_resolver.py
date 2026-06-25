@@ -23,8 +23,22 @@ class YoutubeResolver(AudioResolverProtocol):
         if not self._is_youtube_url(link):
             raise InvalidLinkError(f"Not a YouTube URL: {link}")
 
+        title, duration, watch_url = await self._fetch_metadata(link)
+
+        if title is None:
+            raise InvalidLinkError("Could not resolve video title")
+
+        return Track(
+            link=watch_url,
+            title=title,
+            duration=duration,
+            source=Source.YOUTUBE,
+            resolved=True,
+        )
+
+    async def _fetch_metadata(self, link: str) -> tuple[str | None, int | None, str]:
         try:
-            yt = AsyncYouTube(link)
+            yt = AsyncYouTube(link, "WEB")
         except RegexMatchError as e:
             raise InvalidLinkError(str(e)) from e
 
@@ -38,16 +52,7 @@ class YoutubeResolver(AudioResolverProtocol):
         except (MaxRetriesExceeded, OSError) as e:
             raise NetworkError(str(e)) from e
 
-        if title is None:
-            raise InvalidLinkError("Could not resolve video title")
-
-        return Track(
-            link=yt.watch_url,
-            title=title,
-            duration=duration,
-            source=Source.YOUTUBE,
-            resolved=True,
-        )
+        return title, duration, yt.watch_url
 
     @staticmethod
     def _is_youtube_url(link: str) -> bool:
