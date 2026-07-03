@@ -23,7 +23,9 @@ _registry: dict[str, CommandHandler] = {}
 
 
 def register(
-    name: str, guild_only: bool = False, voice: bool = False  # pragma: no mutate
+    name: str,
+    guild_only: bool = False,
+    voice: bool = False,  # pragma: no mutate
 ) -> Callable[[Handler], Handler]:
     def decorator(func: Handler) -> Handler:
         _registry[name] = CommandHandler(func=func, guild_only=guild_only, voice=voice)
@@ -36,4 +38,17 @@ def get_handlers() -> dict[str, CommandHandler]:
     return dict(_registry)
 
 
-from harpi.application.commands import handlers  # noqa: E402, F401
+from harpi.application.commands import (  # noqa: E402, F401
+    play,
+    pause,
+    resume,
+    skip,
+    stop,
+    background_set,
+    background_add,
+    background_remove,
+    volume,
+    loop,
+    rm,
+    queue,
+)

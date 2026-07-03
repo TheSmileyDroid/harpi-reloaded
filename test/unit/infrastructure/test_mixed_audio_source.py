@@ -47,11 +47,15 @@ class TestMixedAudioSourceRead:
 
         result = mixer.read()
 
-        expected = np.clip(
-            np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 2,
-            -32768,
-            32767,
-        ).astype(np.int16).tobytes()
+        expected = (
+            np.clip(
+                np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 2,
+                -32768,
+                32767,
+            )
+            .astype(np.int16)
+            .tobytes()
+        )
         assert result == expected
 
     def test_read_returns_empty_when_no_sources(self):
@@ -66,9 +70,7 @@ class TestMixedAudioSourceRead:
         bg_frame = _frame(amplitude=0.3)
         fg_proc = FakeProcess(fg_frame)
         bg_proc = FakeProcess(bg_frame * 2)
-        mixer = MixedAudioSource(
-            processes=[fg_proc, bg_proc], volumes=[1.0, 1.0]
-        )
+        mixer = MixedAudioSource(processes=[fg_proc, bg_proc], volumes=[1.0, 1.0])
 
         mixer.read()
         result = mixer.read()
@@ -94,7 +96,11 @@ class TestMixedAudioSourceVolumeBVA:
 
         result = mixer.read()
 
-        expected = (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.001).astype(np.int16).tobytes()
+        expected = (
+            (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.001)
+            .astype(np.int16)
+            .tobytes()
+        )
         assert result == expected
 
     def test_volume_just_below_maximum(self):
@@ -104,7 +110,11 @@ class TestMixedAudioSourceVolumeBVA:
 
         result = mixer.read()
 
-        expected = (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.999).astype(np.int16).tobytes()
+        expected = (
+            (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.999)
+            .astype(np.int16)
+            .tobytes()
+        )
         assert result == expected
 
     def test_volume_maximum(self):
@@ -137,7 +147,11 @@ class TestMixedAudioSourceDynamic:
         mixer.set_volume(0, 0.5)
         result = mixer.read()
 
-        expected = (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.5).astype(np.int16).tobytes()
+        expected = (
+            (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.5)
+            .astype(np.int16)
+            .tobytes()
+        )
         assert result == expected
 
     def test_add_source_mid_playback(self):
@@ -151,11 +165,16 @@ class TestMixedAudioSourceDynamic:
         mixer.add_source(bg_proc, 0.5)
         result = mixer.read()
 
-        expected = np.clip(
-            np.frombuffer(_silent_frame(), dtype=np.int16).astype(np.float32)
-            + np.frombuffer(bg, dtype=np.int16).astype(np.float32) * 0.5,
-            -32768, 32767,
-        ).astype(np.int16).tobytes()
+        expected = (
+            np.clip(
+                np.frombuffer(_silent_frame(), dtype=np.int16).astype(np.float32)
+                + np.frombuffer(bg, dtype=np.int16).astype(np.float32) * 0.5,
+                -32768,
+                32767,
+            )
+            .astype(np.int16)
+            .tobytes()
+        )
         assert result == expected
 
     def test_remove_source_mid_playback(self):

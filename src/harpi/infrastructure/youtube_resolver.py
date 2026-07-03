@@ -8,15 +8,19 @@ from pytubefix.exceptions import (
     MaxRetriesExceeded,
 )
 
-from harpi.domain.track import Track, Source
+from harpi.domain.track_metadata import TrackMetadata, Source
 from harpi.application.ports.audio import AudioResolverProtocol
-from harpi.application.exceptions import InvalidLinkError, NetworkError, ResolutionTimeoutError
+from harpi.application.exceptions import (
+    InvalidLinkError,
+    NetworkError,
+    ResolutionTimeoutError,
+)
 
 
 class YoutubeResolver(AudioResolverProtocol):
     TIMEOUT = 15
 
-    async def resolve(self, link: str) -> Track:
+    async def resolve(self, link: str) -> TrackMetadata:
         if not link or not link.strip():
             raise InvalidLinkError("Link is empty")
 
@@ -28,12 +32,11 @@ class YoutubeResolver(AudioResolverProtocol):
         if title is None:
             raise InvalidLinkError("Could not resolve video title")
 
-        return Track(
+        return TrackMetadata(
             link=watch_url,
             title=title,
             duration=duration,
             source=Source.YOUTUBE,
-            resolved=True,
         )
 
     async def _fetch_metadata(self, link: str) -> tuple[str | None, int | None, str]:
@@ -46,7 +49,9 @@ class YoutubeResolver(AudioResolverProtocol):
             title = await asyncio.wait_for(yt.title(), timeout=self.TIMEOUT)
             duration = await asyncio.wait_for(yt.length(), timeout=self.TIMEOUT)
         except asyncio.TimeoutError as e:
-            raise ResolutionTimeoutError(f"Resolution timed out after {self.TIMEOUT}s") from e
+            raise ResolutionTimeoutError(
+                f"Resolution timed out after {self.TIMEOUT}s"
+            ) from e
         except (VideoUnavailable, VideoPrivate, RegexMatchError) as e:
             raise InvalidLinkError(str(e)) from e
         except (MaxRetriesExceeded, OSError) as e:

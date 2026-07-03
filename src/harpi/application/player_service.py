@@ -1,6 +1,6 @@
 from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProtocol
 from harpi.domain.queue import Queue
-from harpi.domain.track import Track
+from harpi.domain.track_metadata import TrackMetadata
 
 
 class PlayerService:
@@ -14,7 +14,7 @@ class PlayerService:
         return self._queue
 
     @property
-    def playing(self) -> Track | None:
+    def playing(self) -> TrackMetadata | None:
         return self._player.playing
 
     @property
@@ -42,7 +42,7 @@ class PlayerService:
         self._player.remove_background_source(index)
 
     async def set_background_tracks(self, links: list[str]) -> tuple[int, int]:
-        resolved: list[Track] = []
+        resolved: list[TrackMetadata] = []
         failed = 0
         for link in links:
             try:

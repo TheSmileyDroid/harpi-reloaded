@@ -2,7 +2,7 @@ import asyncio
 import os
 import pytest
 
-from harpi.domain.track import Track, Source
+from harpi.domain.track_metadata import TrackMetadata, Source
 from harpi.infrastructure.discord_player import DiscordPlayer
 
 
@@ -67,13 +67,12 @@ async def voice_client(discord_client):
 
 
 @pytest.fixture
-def test_track() -> Track:
-    return Track(
+def test_track() -> TrackMetadata:
+    return TrackMetadata(
         link="https://youtu.be/jNQXAC9IVRw",
         title="Me at the zoo",
         duration=19,
         source=Source.YOUTUBE,
-        resolved=True,
     )
 
 
@@ -131,12 +130,11 @@ class TestDiscordPlayerRealVoice:
         async def on_finish():
             finished.set()
 
-        track = Track(
+        track = TrackMetadata(
             link="https://youtu.be/jNQXAC9IVRw",
             title="Me at the zoo",
             duration=19,
             source=Source.YOUTUBE,
-            resolved=True,
         )
         await player.play(track, on_finish=on_finish)
         await asyncio.sleep(1)

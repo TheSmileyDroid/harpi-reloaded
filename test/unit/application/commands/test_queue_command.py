@@ -3,12 +3,12 @@ from harpi.application.player_service import PlayerService
 from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.application.ports.audio import AudioResolverProtocol
 from harpi.application.exceptions import InvalidLinkError
-from harpi.domain.track import Track, Source
+from harpi.domain.track_metadata import TrackMetadata, Source
 
 
 class NoTitleResolver(AudioResolverProtocol):
-    async def resolve(self, link: str) -> Track:
-        return Track(link=link, source=Source.YOUTUBE, duration=120, resolved=True)
+    async def resolve(self, link: str) -> TrackMetadata:
+        return TrackMetadata(link=link, source=Source.YOUTUBE, duration=120)
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def service():
 @pytest.mark.asyncio
 class TestQueueCommand:
     async def test_queue_empty(self):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         svc = PlayerService(resolver=FakeResolver(), player=FakePlayer())
@@ -31,7 +31,7 @@ class TestQueueCommand:
 
     async def test_queue_with_one_track(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
@@ -41,7 +41,7 @@ class TestQueueCommand:
         assert result.footer == "Total: 1 músicas | Loop: off"
 
     async def test_queue_with_one_track_shows_position(self):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
         from test.unit.conftest import FakeResolver, FakePlayer
 
@@ -59,7 +59,7 @@ class TestQueueCommand:
         await service.play("https://youtu.be/abc")
         await service.play("https://youtu.be/def")
         await service.play("https://youtu.be/ghi")
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
@@ -73,7 +73,7 @@ class TestQueueCommand:
     async def test_queue_shows_playing_track_first(self, service: PlayerService):
         await service.play("https://youtu.be/abc")
         await service.play("https://youtu.be/ghi")
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         result = await handle_queue(service, "")
@@ -86,7 +86,7 @@ class TestQueueCommand:
     async def test_queue_track_without_title_shows_fallback_current(self):
         svc = PlayerService(resolver=NoTitleResolver(), player=FakePlayer())
         await svc.play("https://youtu.be/abc")
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         result = await handle_queue(svc, "")
@@ -99,7 +99,7 @@ class TestQueueCommand:
         svc = PlayerService(resolver=NoTitleResolver(), player=FakePlayer())
         await svc.play("https://youtu.be/abc")
         await svc.play("https://youtu.be/def")
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         result = await handle_queue(svc, "")
@@ -108,32 +108,30 @@ class TestQueueCommand:
         assert "1. Desconhecida (02:00)" in result.description
 
     async def test_format_duration_returns_formatted_time(self):
-        from harpi.application.commands.handlers import _format_duration
+        from harpi.application.commands.queue import _format_duration
 
         assert _format_duration(0) == "00:00"
         assert _format_duration(60) == "01:00"
         assert _format_duration(3661) == "61:01"
         assert _format_duration(None) == "--:--"
 
-    async def test_format_playing_duration_with_position_and_duration(
-        self, track1
-    ):
-        from harpi.application.commands.handlers import _format_playing_duration
+    async def test_format_playing_duration_with_position_and_duration(self, track1):
+        from harpi.application.commands.queue import _format_playing_duration
 
         result = _format_playing_duration(track1, 30.0)
-        assert result == "00:30/60:00"
+        assert result == "00:30/02:00"
 
     async def test_format_playing_duration_without_position(self, track1):
-        from harpi.application.commands.handlers import _format_playing_duration
+        from harpi.application.commands.queue import _format_playing_duration
 
         result = _format_playing_duration(track1, None)
-        assert result == "60:00"
+        assert result == "02:00"
 
     async def test_format_playing_duration_with_duration_none(self):
-        from harpi.application.commands.handlers import _format_playing_duration
-        from harpi.domain.track import Track, Source
+        from harpi.application.commands.queue import _format_playing_duration
+        from harpi.domain.track_metadata import TrackMetadata, Source
 
-        track = Track(link="https://youtu.be/abc", source=Source.YOUTUBE)
+        track = TrackMetadata(link="https://youtu.be/abc", source=Source.YOUTUBE)
         result = _format_playing_duration(track, None)
         assert result == "--:--"
 
@@ -201,10 +199,8 @@ class TestRegistry:
 
 @pytest.mark.asyncio
 class TestBackgroundCommands:
-    async def test_bg_replaces_all_with_multiple_links(
-        self, service: PlayerService
-    ):
-        from harpi.application.commands.handlers import handle_bg
+    async def test_bg_replaces_all_with_multiple_links(self, service: PlayerService):
+        from harpi.application.commands.background_set import handle_bg
 
         await service.add_background_track("https://youtu.be/old")
         result = await handle_bg(service, "https://youtu.be/a https://youtu.be/b")
@@ -213,7 +209,7 @@ class TestBackgroundCommands:
         assert len(service.queue.background_tracks) == 2
 
     async def test_bg_partial_failure_shows_count(self):
-        from harpi.application.commands.handlers import handle_bg
+        from harpi.application.commands.background_set import handle_bg
 
         resolver = FakeResolver()
         resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad"))
@@ -227,7 +223,7 @@ class TestBackgroundCommands:
         assert svc.queue.background_tracks[0].link == "https://youtu.be/good"
 
     async def test_bgadd_handler(self, service: PlayerService):
-        from harpi.application.commands.handlers import handle_bgadd
+        from harpi.application.commands.background_add import handle_bgadd
 
         await service.add_background_track("https://youtu.be/old")
         result = await handle_bgadd(service, "https://youtu.be/new")
@@ -236,14 +232,14 @@ class TestBackgroundCommands:
         assert service.queue.background_tracks[1].link == "https://youtu.be/new"
 
     async def test_bgadd_empty_args_returns_error(self, service: PlayerService):
-        from harpi.application.commands.handlers import handle_bgadd
+        from harpi.application.commands.background_add import handle_bgadd
 
         result = await handle_bgadd(service, "")
         assert isinstance(result, str)
         assert "vazio" in result
 
     async def test_bgrm_handler_by_index(self, service: PlayerService):
-        from harpi.application.commands.handlers import handle_bgrm
+        from harpi.application.commands.background_remove import handle_bgrm
 
         await service.add_background_track("https://youtu.be/abc")
         await service.add_background_track("https://youtu.be/def")
@@ -256,7 +252,7 @@ class TestBackgroundCommands:
     async def test_bgrm_handler_invalid_index_returns_error(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_bgrm
+        from harpi.application.commands.background_remove import handle_bgrm
 
         result = await handle_bgrm(service, "abc")
         assert isinstance(result, str)
@@ -265,14 +261,14 @@ class TestBackgroundCommands:
     async def test_bgrm_handler_out_of_bounds_returns_error(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_bgrm
+        from harpi.application.commands.background_remove import handle_bgrm
 
         result = await handle_bgrm(service, "5")
         assert isinstance(result, str)
         assert "inválido" in result
 
     async def test_bgrm_handler_empty_args_returns_error(self, service: PlayerService):
-        from harpi.application.commands.handlers import handle_bgrm
+        from harpi.application.commands.background_remove import handle_bgrm
 
         result = await handle_bgrm(service, "")
         assert isinstance(result, str)
@@ -284,7 +280,7 @@ class TestQueueBackgroundEmbed:
     async def test_queue_shows_background_tracks_with_positions(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         await service.play("https://youtu.be/abc")
@@ -299,12 +295,14 @@ class TestQueueBackgroundEmbed:
     async def test_queue_bg_track_without_title_shows_fallback(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
-        from harpi.domain.track import Track, Source
+        from harpi.domain.track_metadata import TrackMetadata, Source
 
         await service.play("https://youtu.be/abc")
-        bg_track = Track(link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120, resolved=True)
+        bg_track = TrackMetadata(
+            link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120
+        )
         service.queue.add_background_track(bg_track)
 
         result = await handle_queue(service, "")
@@ -315,23 +313,28 @@ class TestQueueBackgroundEmbed:
     async def test_queue_shows_background_tracks_when_nothing_playing(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
 
         await service.add_background_track("https://youtu.be/bg1")
 
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
-        assert "Nada tocando no momento.\n\n**Músicas de fundo:**\n0. Fake Track" in result.description
+        assert (
+            "Nada tocando no momento.\n\n**Músicas de fundo:**\n0. Fake Track"
+            in result.description
+        )
 
     async def test_queue_shows_bg_track_without_title_fallback_when_nothing_playing(
         self, service: PlayerService
     ):
-        from harpi.application.commands.handlers import handle_queue
+        from harpi.application.commands.queue import handle_queue
         from harpi.application.commands import EmbedData
-        from harpi.domain.track import Track, Source
+        from harpi.domain.track_metadata import TrackMetadata, Source
 
-        bg_track = Track(link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120, resolved=True)
+        bg_track = TrackMetadata(
+            link="https://youtu.be/bg1", source=Source.YOUTUBE, duration=120
+        )
         service.queue.add_background_track(bg_track)
 
         result = await handle_queue(service, "")

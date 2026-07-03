@@ -80,7 +80,8 @@ Remove tests that are:
 | Mutation | `uv run mutmut run` |
 | Lint | `uv run ruff check src/ test/` |
 | Format | `uv run ruff format src/ test/` |
-| All | `uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run pytest test/ -v` |
+| Dead code | `uv run vulture` |
+| All | `uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run vulture && uv run pytest test/ -v` |
 
 ### Commit Workflow
 - Before committing, check Linear for the task currently **In Progress**
@@ -173,3 +174,7 @@ src/harpi/
 
 ## Linear Tasks
 Check current linear task for project harpi-reloaded-5482169455d9 (Harpi Reloaded) on linear MCP to get the current context. You can also check the other tasks.
+
+## Architetura de referência
+
+This file is openly modifiable, any content here in AGENTS.md can be changed. However, there is the file docs/architecture.md that is the core definition of the architecture and cannot be modified in any case. Making something differently from that file is only permitted clearly asking the user.

@@ -1,5 +1,5 @@
 import pytest
-from harpi.domain.track import Source
+from harpi.domain.track_metadata import Source
 from harpi.application.exceptions import InvalidLinkError
 
 
@@ -21,7 +21,6 @@ class TestYoutubeResolver:
         assert len(track.title) > 0
         assert track.duration is not None
         assert track.duration > 0
-        assert track.resolved is True
 
     @pytest.mark.asyncio
     async def test_resolve_youtube_watch_url(self):

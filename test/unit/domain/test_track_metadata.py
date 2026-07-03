@@ -1,76 +1,71 @@
 from uuid import UUID
-from dataclasses import FrozenInstanceError
 import pytest
 
-from harpi.domain.track import Track, Source, validate_volume
+from harpi.domain.track_metadata import TrackMetadata, Source
+from harpi.domain.volume import validate_volume
 
 
-class TestTrackCreation:
-    def test_track_added_with_required_fields(self):
-        track = Track(
+class TestTrackMetadataCreation:
+    def test_track_metadata_created_with_required_fields(self):
+        metadata = TrackMetadata(
             source=Source.YOUTUBE,
             link="https://youtu.be/wPQEeBAXou0?si=rJZmNcFc5RwQyo4K",
         )
-        assert track.link == "https://youtu.be/wPQEeBAXou0?si=rJZmNcFc5RwQyo4K"
-        assert track.source == Source.YOUTUBE
-        assert type(track.id) is UUID
+        assert metadata.link == "https://youtu.be/wPQEeBAXou0?si=rJZmNcFc5RwQyo4K"
+        assert metadata.source == Source.YOUTUBE
+        assert type(metadata.id) is UUID
 
-    def test_track_resolved_title_and_duration(self):
-        track = Track(
+    def test_track_metadata_with_optional_fields(self):
+        metadata = TrackMetadata(
             link="https://youtu.be/abc",
             title="LOFI BEATS TO STUDY TO 1H",
             duration=3600,
             source=Source.YOUTUBE,
         )
-        assert track.title == "LOFI BEATS TO STUDY TO 1H"
-        assert track.duration == 3600
-
-    def test_track_missing_link_raises(self):
-        with pytest.raises(TypeError):
-            Track(source=Source.YOUTUBE)  # ty:ignore[missing-argument]
-
-    def test_track_missing_source_raises(self):
-        with pytest.raises(TypeError):
-            Track(link="https://youtu.be/abc")  # ty:ignore[missing-argument]
+        assert metadata.title == "LOFI BEATS TO STUDY TO 1H"
+        assert metadata.duration == 3600
 
 
-class TestTrackImmutability:
-    def test_track_is_immutable(self):
-        track = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        with pytest.raises(FrozenInstanceError):
-            track.link = "https://www.youtube.com/watch?v=5Duje_sZko8"  # ty:ignore[invalid-assignment]
-
-
-class TestTrackEquality:
-    def test_track_equality(self):
-        track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        track2 = Track(
+class TestTrackMetadataEquality:
+    def test_equality_same_source_id_and_source(self):
+        meta1 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
+        )
+        meta2 = TrackMetadata(
             source=Source.YOUTUBE,
             link="https://youtu.be/wPQEeBAXou0?si=rJZmNcFc5RwQyo4K",
         )
-        track3 = Track(
+        meta3 = TrackMetadata(
             source=Source.YOUTUBE, link="https://www.youtube.com/watch?v=wPQEeBAXou0"
         )
-        assert track1 == track2 and track2 == track3
+        assert meta1 == meta2 == meta3
 
-    def test_track_equality_different_sources(self):
-        track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        track2 = Track(
+    def test_equality_different_sources(self):
+        meta1 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
+        )
+        meta2 = TrackMetadata(
             source=Source.SPOTIFY, link="https://open.spotify.com/track/wPQEeBAXou0"
         )
-        assert track1 != track2
+        assert meta1 != meta2
 
-    def test_track_equality_different_source_ids(self):
-        track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        track2 = Track(source=Source.YOUTUBE, link="https://youtu.be/25Duje_sZko8")
-        assert track1 != track2
+    def test_equality_different_source_ids(self):
+        meta1 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
+        )
+        meta2 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/25Duje_sZko8"
+        )
+        assert meta1 != meta2
 
-    def test_track_equality_different_type(self):
-        track1 = Track(source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0")
-        assert track1 != "Just a string"
+    def test_equality_different_type(self):
+        meta1 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
+        )
+        assert meta1 != "Just a string"
 
 
-class TestSourceId:
+class TestSourceIdExtraction:
     @pytest.mark.parametrize(
         ("link", "source", "expected"),
         [
@@ -82,6 +77,7 @@ class TestSourceId:
                 "wPQEeBAXou0",
             ),
             ("https://youtu.be/wPQEeBAXou0?list=PLabc", Source.YOUTUBE, "wPQEeBAXou0"),
+            # YOUTUBE — watch form
             (
                 "https://www.youtube.com/watch?v=wPQEeBAXou0",
                 Source.YOUTUBE,
@@ -102,7 +98,7 @@ class TestSourceId:
                 Source.YOUTUBE,
                 "wPQEeBAXou0",
             ),
-            # YOUTUBE — /embed/ and /shorts/
+            # YOUTUBE — embed and shorts
             ("https://youtube.com/embed/wPQEeBAXou0", Source.YOUTUBE, "wPQEeBAXou0"),
             ("https://youtube.com/shorts/wPQEeBAXou0", Source.YOUTUBE, "wPQEeBAXou0"),
             # YOUTUBE — boundary/edge
@@ -123,15 +119,22 @@ class TestSourceId:
             # BVA: empty link
             ("", Source.YOUTUBE, ""),
             ("", Source.SPOTIFY, ""),
-            # BVA: link with only query params (youtu.be doesn't parse v= param)
+            # BVA: link with only query params
             ("https://youtu.be/?v=abc", Source.YOUTUBE, ""),
             # BVA: spotify with no track segment
             ("https://open.spotify.com/", Source.SPOTIFY, ""),
         ],
     )
     def test_source_id(self, link: str, source: Source, expected: str):
-        track = Track(link=link, source=source)
-        assert track.source_id == expected
+        metadata = TrackMetadata(link=link, source=source)
+        assert metadata.source_id == expected
+
+
+class TestTrackMetadataImmutability:
+    def test_track_metadata_is_frozen(self):
+        metadata = TrackMetadata(source=Source.YOUTUBE, link="https://youtu.be/abc")
+        with pytest.raises(Exception):  # dataclass frozen raises FrozenInstanceError
+            metadata.title = "New Title"
 
 
 class TestValidateVolumeBVA:

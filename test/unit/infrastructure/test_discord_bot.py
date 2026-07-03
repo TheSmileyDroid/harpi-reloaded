@@ -275,9 +275,7 @@ class TestHarpiBotVoiceConnection:
         bot = _bot_with_resolver()
         player, _ = _inject_guild_state(bot)
         guild = _FakeGuild()
-        msg = _FakeDiscordMessage(
-            content="-queue", guild=guild, voice=None
-        )
+        msg = _FakeDiscordMessage(content="-queue", guild=guild, voice=None)
 
         response = await bot.handle_discord_message(msg)
 

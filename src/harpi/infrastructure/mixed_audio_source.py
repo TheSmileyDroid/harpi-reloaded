@@ -4,7 +4,7 @@ import numpy as np
 import discord
 from discord.opus import Encoder
 
-from harpi.domain.track import validate_volume
+from harpi.domain.volume import validate_volume
 
 PCM_FRAME_SIZE: int = Encoder.FRAME_SIZE
 

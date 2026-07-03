@@ -26,6 +26,9 @@ jobs:
       - name: Lint
         run: uv run ruff check src/ test/
 
+      - name: Dead code
+        run: uv run vulture
+
       - name: Type check
         run: uv run ty check src/harpi/ test/ main.py
 

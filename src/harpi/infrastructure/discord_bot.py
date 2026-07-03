@@ -20,6 +20,7 @@ class HarpiBot:
         self._resolver = resolver
         self._guild_players: dict[int, DiscordPlayer] = {}
         self._guild_routers: dict[int, CommandRouter] = {}
+        self._router: CommandRouter | None = None
 
         if player_service is not None:
             self._router = CommandRouter(player_service=player_service, prefix=prefix)

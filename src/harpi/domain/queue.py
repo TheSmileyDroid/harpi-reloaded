@@ -1,58 +1,51 @@
-from harpi.domain.track import Track
-from enum import Enum
-
-
-class LoopMode(Enum):
-    TRACK = "track"
-    QUEUE = "queue"
-    OFF = "off"
+from harpi.domain.loop_mode import LoopMode
+from harpi.domain.track_metadata import TrackMetadata
 
 
 class Queue:
     def __init__(self):
-        self._queue: list[Track] = []
-        self._background: list[Track] = []
+        self._queue: list[TrackMetadata] = []
+        self._background: list[TrackMetadata] = []
         self._loop_mode: LoopMode = LoopMode.OFF
 
-    def add_track(self, track: Track | list[Track]) -> None:
+    def add_track(self, track: TrackMetadata | list[TrackMetadata]) -> None:
         if isinstance(track, list):
-            self._queue.extend(track)  # type: ignore
+            self._queue.extend(track)
         else:
             self._queue.append(track)
 
     def clear_tracks(self) -> None:
         self._queue.clear()
 
-    def add_background_track(self, track: Track) -> None:
+    def add_background_track(self, track: TrackMetadata) -> None:
         self._background.append(track)
 
-    def remove_background_track(self, track_or_index: Track | int) -> None:
+    def remove_background_track(self, track_or_index: TrackMetadata | int) -> None:
         if isinstance(track_or_index, int):
             self._background.pop(track_or_index)
         else:
             self._background = [t for t in self._background if t != track_or_index]
 
-    def set_background_tracks(self, tracks: list[Track]) -> None:
+    def set_background_tracks(self, tracks: list[TrackMetadata]) -> None:
         self._background = list(tracks)
 
     def clear_background_tracks(self) -> None:
         self._background.clear()
 
-    def next_background_track(self) -> Track | None:
+    def next_background_track(self) -> TrackMetadata | None:
         if not self._background:
             return None
         track = self._background.pop(0)
         self._background.append(track)
         return track
 
-    def get_current_track(self) -> Track | None:
+    def get_current_track(self) -> TrackMetadata | None:
         return self._queue[0] if self._queue else None
 
-    def skip_track(self) -> Track | None:
+    def skip_track(self) -> TrackMetadata | None:
         if self._queue:
             if self._loop_mode == LoopMode.TRACK:
                 track = self._queue[0]
-                # TODO: Resets the track to the beginning
                 return track
             if self._loop_mode == LoopMode.QUEUE:
                 track = self._queue.pop(0)
@@ -69,13 +62,13 @@ class Queue:
     def set_loop_mode(self, mode: LoopMode) -> None:
         self._loop_mode = mode
 
-    def remove_track(self, track: Track) -> None:
+    def remove_track(self, track: TrackMetadata) -> None:
         self._queue = [t for t in self._queue if t != track]
 
     @property
-    def tracks(self) -> list[Track]:
+    def tracks(self) -> list[TrackMetadata]:
         return list(self._queue)
 
     @property
-    def background_tracks(self) -> list[Track]:
+    def background_tracks(self) -> list[TrackMetadata]:
         return list(self._background)

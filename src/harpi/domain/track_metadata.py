@@ -1,19 +1,7 @@
 from uuid import UUID
 from uuid import uuid4
-from functools import cached_property
 from dataclasses import dataclass, field
-
 from enum import Enum
-
-MIN_VOLUME: float = 0.0
-MAX_VOLUME: float = 1.0
-
-
-def validate_volume(value: float, name: str = "Volume") -> None:
-    if not MIN_VOLUME <= value <= MAX_VOLUME:
-        raise ValueError(
-            f"{name} must be between {MIN_VOLUME} and {MAX_VOLUME}, got {value}"
-        )
 
 
 class Source(Enum):
@@ -22,15 +10,14 @@ class Source(Enum):
 
 
 @dataclass(frozen=True, eq=False)
-class Track:
+class TrackMetadata:
     link: str
     source: Source
     id: UUID = field(default_factory=uuid4)
     title: str | None = None
     duration: int | None = None
-    resolved: bool = False
 
-    @cached_property
+    @property
     def source_id(self) -> str:
         """Extract the source ID from the link."""
         if self.source == Source.YOUTUBE:
@@ -45,7 +32,7 @@ class Track:
         return ""
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Track):
+        if not isinstance(other, TrackMetadata):
             return NotImplemented
         return self.source_id == other.source_id and self.source == other.source
 

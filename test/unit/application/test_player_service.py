@@ -1,14 +1,18 @@
 from test.unit.conftest import FakeResolver, FakePlayer
 from harpi.domain.queue import LoopMode
 from harpi.application.player_service import PlayerService
-from harpi.application.exceptions import InvalidLinkError, NetworkError, ResolutionTimeoutError
+from harpi.application.exceptions import (
+    InvalidLinkError,
+    NetworkError,
+    ResolutionTimeoutError,
+)
 import pytest
-from harpi.domain.track import Track
+from harpi.domain.track_metadata import TrackMetadata
 
 
 class TestPlayerServicePlay:
     @pytest.mark.asyncio
-    async def test_play_url_resolves_and_enqueues_track(self, track1: Track):
+    async def test_play_url_resolves_and_enqueues_track(self, track1: TrackMetadata):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -20,7 +24,7 @@ class TestPlayerServicePlay:
 
     @pytest.mark.asyncio
     async def test_play_enqueues_without_calling_play_when_already_playing(
-        self, track1: Track
+        self, track1: TrackMetadata
     ):
         resolver = FakeResolver()
         player = FakePlayer()
@@ -68,7 +72,9 @@ class TestPlayerServicePauseResume:
 
 class TestPlayerServiceSkip:
     @pytest.mark.asyncio
-    async def test_skip_track_stops_current_and_starts_next(self, track2: Track):
+    async def test_skip_track_stops_current_and_starts_next(
+        self, track2: TrackMetadata
+    ):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -160,7 +166,7 @@ class TestPlayerServiceStop:
 class TestPlayerServiceOnTrackEnd:
     @pytest.mark.asyncio
     async def test_on_track_end_advances_to_next_track(
-        self, track1: Track, track2: Track
+        self, track1: TrackMetadata, track2: TrackMetadata
     ):
         resolver = FakeResolver()
         player = FakePlayer()
@@ -182,7 +188,7 @@ class TestPlayerServiceOnTrackEnd:
         assert svc.queue.get_current_track() is None
 
     @pytest.mark.asyncio
-    async def test_on_track_end_loop_track_replays_same(self, track1: Track):
+    async def test_on_track_end_loop_track_replays_same(self, track1: TrackMetadata):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -252,7 +258,9 @@ class TestPlayerServiceWithFailingResolver:
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
-        resolver.set_failure("https://youtu.be/slow", ResolutionTimeoutError("Timed out"))
+        resolver.set_failure(
+            "https://youtu.be/slow", ResolutionTimeoutError("Timed out")
+        )
 
         with pytest.raises(ResolutionTimeoutError):
             await svc.play("https://youtu.be/slow")
@@ -285,7 +293,9 @@ class TestPlayerServiceBackgroundAdd:
         assert svc.queue.background_tracks[0].link == "https://youtu.be/abc"
 
     @pytest.mark.asyncio
-    async def test_add_background_track_does_not_affect_main_queue(self, track1: Track):
+    async def test_add_background_track_does_not_affect_main_queue(
+        self, track1: TrackMetadata
+    ):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -329,7 +339,7 @@ class TestPlayerServiceBackgroundRemove:
 
 class TestPlayerServiceBackgroundSet:
     @pytest.mark.asyncio
-    async def test_set_background_tracks_replaces_all(self, track1: Track):
+    async def test_set_background_tracks_replaces_all(self, track1: TrackMetadata):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -390,7 +400,9 @@ class TestPlayerServiceBackgroundIsolation:
 
 class TestPlayerServiceDucking:
     @pytest.mark.asyncio
-    async def test_play_ducks_background_when_nothing_playing(self, track1: Track):
+    async def test_play_ducks_background_when_nothing_playing(
+        self, track1: TrackMetadata
+    ):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -399,7 +411,9 @@ class TestPlayerServiceDucking:
         assert player.background_volume == player._duck_level
 
     @pytest.mark.asyncio
-    async def test_play_does_not_duck_again_when_already_playing(self, track1: Track):
+    async def test_play_does_not_duck_again_when_already_playing(
+        self, track1: TrackMetadata
+    ):
         resolver = FakeResolver()
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
@@ -587,5 +601,7 @@ class TestPlayerServiceBackgroundDelegation:
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/old")
-        await svc.set_background_tracks(["https://youtu.be/new1", "https://youtu.be/new2"])
+        await svc.set_background_tracks(
+            ["https://youtu.be/new1", "https://youtu.be/new2"]
+        )
         assert len(player.background_tracks) == 2

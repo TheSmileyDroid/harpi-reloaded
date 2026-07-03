@@ -1,15 +1,12 @@
 from typing import Any
 import pytest
 from harpi.application.ports.audio import AudioPlayerProtocol
-from harpi.domain.track import Track, Source
+from harpi.domain.track_metadata import TrackMetadata, Source
 
 
 class FakeAudioSource:
     def cleanup(self) -> None:
         pass
-
-
-
 
 
 class FakeVoiceClient:
@@ -54,7 +51,7 @@ def player(voice_client):
     from harpi.infrastructure.discord_player import DiscordPlayer
 
     class TestDiscordPlayer(DiscordPlayer):
-        async def _build_mixed_source(self, track: Track) -> Any:
+        async def _build_mixed_source(self, track: TrackMetadata) -> Any:
             return FakeAudioSource()
 
     return TestDiscordPlayer(voice_client=voice_client)
@@ -62,7 +59,7 @@ def player(voice_client):
 
 @pytest.fixture
 def track():
-    return Track(
+    return TrackMetadata(
         link="https://youtu.be/abc123",
         title="Test Track",
         duration=120,
@@ -72,7 +69,7 @@ def track():
 
 @pytest.fixture
 def bg_track():
-    return Track(
+    return TrackMetadata(
         link="https://youtu.be/bg123",
         title="BG Track",
         duration=300,
@@ -96,33 +93,39 @@ class TestDiscordPlayerInitialState:
 
 class TestDiscordPlayerPlay:
     async def test_play_sets_playing_to_track(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.play(track)
         assert player.playing is track
 
     async def test_play_calls_voice_client_play(
-        self, player: AudioPlayerProtocol, track: Track, voice_client: FakeVoiceClient
+        self,
+        player: AudioPlayerProtocol,
+        track: TrackMetadata,
+        voice_client: FakeVoiceClient,
     ):
         await player.play(track)
         assert voice_client.is_playing()
 
     async def test_play_clears_is_stopped(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.stop()
         await player.play(track)
         assert player.is_stopped is False
 
     async def test_play_clears_is_paused(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.pause()
         await player.play(track)
         assert player.is_paused is False
 
     async def test_play_passes_source_to_voice_client(
-        self, player: AudioPlayerProtocol, track: Track, voice_client: FakeVoiceClient
+        self,
+        player: AudioPlayerProtocol,
+        track: TrackMetadata,
+        voice_client: FakeVoiceClient,
     ):
         await player.play(track)
         assert voice_client._source is not None
@@ -130,14 +133,17 @@ class TestDiscordPlayerPlay:
 
 class TestDiscordPlayerPause:
     async def test_pause_sets_is_paused(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.play(track)
         await player.pause()
         assert player.is_paused is True
 
     async def test_pause_calls_voice_client_pause(
-        self, player: AudioPlayerProtocol, track: Track, voice_client: FakeVoiceClient
+        self,
+        player: AudioPlayerProtocol,
+        track: TrackMetadata,
+        voice_client: FakeVoiceClient,
     ):
         await player.play(track)
         await player.pause()
@@ -146,7 +152,7 @@ class TestDiscordPlayerPause:
 
 class TestDiscordPlayerResume:
     async def test_resume_clears_is_paused(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.play(track)
         await player.pause()
@@ -154,7 +160,10 @@ class TestDiscordPlayerResume:
         assert player.is_paused is False
 
     async def test_resume_calls_voice_client_resume(
-        self, player: AudioPlayerProtocol, track: Track, voice_client: FakeVoiceClient
+        self,
+        player: AudioPlayerProtocol,
+        track: TrackMetadata,
+        voice_client: FakeVoiceClient,
     ):
         await player.play(track)
         await player.pause()
@@ -164,19 +173,24 @@ class TestDiscordPlayerResume:
 
 class TestDiscordPlayerStop:
     async def test_stop_sets_is_stopped(
-        self, player: AudioPlayerProtocol, track: Track
+        self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
         await player.play(track)
         await player.stop()
         assert player.is_stopped is True
 
-    async def test_stop_clears_playing(self, player: AudioPlayerProtocol, track: Track):
+    async def test_stop_clears_playing(
+        self, player: AudioPlayerProtocol, track: TrackMetadata
+    ):
         await player.play(track)
         await player.stop()
         assert player.playing is None
 
     async def test_stop_calls_voice_client_stop(
-        self, player: AudioPlayerProtocol, track: Track, voice_client: FakeVoiceClient
+        self,
+        player: AudioPlayerProtocol,
+        track: TrackMetadata,
+        voice_client: FakeVoiceClient,
     ):
         await player.play(track)
         await player.stop()
@@ -185,7 +199,7 @@ class TestDiscordPlayerStop:
 
 
 class TestDiscordPlayerErrors:
-    async def test_play_without_voice_client_raises(self, track: Track):
+    async def test_play_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
         player = DiscordPlayer()
@@ -194,12 +208,12 @@ class TestDiscordPlayerErrors:
             await player.play(track)
 
     async def test_play_raises_when_build_mixed_source_fails(
-        self, voice_client, track: Track
+        self, voice_client, track: TrackMetadata
     ):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
         class FailingDiscordPlayer(DiscordPlayer):
-            async def _build_mixed_source(self, track: Track) -> Any:
+            async def _build_mixed_source(self, track: TrackMetadata) -> Any:
                 raise ValueError("No audio stream available")
 
         player = FailingDiscordPlayer(voice_client=voice_client)
@@ -207,7 +221,7 @@ class TestDiscordPlayerErrors:
         with pytest.raises(ValueError, match="No audio stream available"):
             await player.play(track)
 
-    async def test_pause_without_voice_client_raises(self, track: Track):
+    async def test_pause_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
         player = DiscordPlayer()
@@ -215,7 +229,7 @@ class TestDiscordPlayerErrors:
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.pause()
 
-    async def test_resume_without_voice_client_raises(self, track: Track):
+    async def test_resume_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
         player = DiscordPlayer()
@@ -223,7 +237,7 @@ class TestDiscordPlayerErrors:
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.resume()
 
-    async def test_stop_without_voice_client_raises(self, track: Track):
+    async def test_stop_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
         player = DiscordPlayer()
@@ -234,34 +248,32 @@ class TestDiscordPlayerErrors:
 
 class TestDiscordPlayerBackgroundSource:
     async def test_add_background_source_adds_to_list(
-        self, player, bg_track: Track
+        self, player, bg_track: TrackMetadata
     ):
         await player.add_background_source(bg_track)
         assert len(player.background_tracks) == 1
         assert player.background_tracks[0] is bg_track
 
     async def test_add_background_source_multiple(
-        self, player, bg_track: Track
+        self, player, bg_track: TrackMetadata
     ):
         await player.add_background_source(bg_track)
         await player.add_background_source(bg_track)
         assert len(player.background_tracks) == 2
 
     async def test_remove_background_source_removes_from_tracks(
-        self, player, bg_track: Track
+        self, player, bg_track: TrackMetadata
     ):
         player.background_tracks = [bg_track]
         player.remove_background_source(0)
         assert len(player.background_tracks) == 0
 
-    async def test_remove_background_source_out_of_bounds_raises(
-        self, player
-    ):
+    async def test_remove_background_source_out_of_bounds_raises(self, player):
         with pytest.raises(IndexError):
             player.remove_background_source(5)
 
     async def test_add_background_source_before_play_starts(
-        self, player, bg_track: Track, track: Track
+        self, player, bg_track: TrackMetadata, track: TrackMetadata
     ):
         await player.add_background_source(bg_track)
         assert len(player.background_tracks) == 1

@@ -9,7 +9,8 @@ from typing import Any
 from pytubefix.async_youtube import AsyncYouTube
 
 from harpi.application.ports.audio import AudioPlayerProtocol
-from harpi.domain.track import Track, validate_volume
+from harpi.domain.track_metadata import TrackMetadata
+from harpi.domain.volume import validate_volume
 from harpi.infrastructure.mixed_audio_source import MixedAudioSource
 
 logger = logging.getLogger(__name__)
@@ -21,14 +22,14 @@ class DiscordPlayer(AudioPlayerProtocol):
         voice_client: Any = None,
     ):
         self._voice_client = voice_client
-        self._current: Track | None = None
+        self._current: TrackMetadata | None = None
         self._start_time: float | None = None
         self._paused_position: float | None = None
         self._on_finish_callback: Callable[[], Coroutine[Any, Any, None]] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._duck_level: float = 0.2
         self._saved_background_volume: float | None = None
-        self.background_tracks: list[Track] = []
+        self.background_tracks: list[TrackMetadata] = []
         self.is_paused: bool = False
         self.is_stopped: bool = False
         self.volume: float = 1.0
@@ -37,7 +38,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._mixed_source: MixedAudioSource | None = None
 
     @property
-    def playing(self) -> Track | None:
+    def playing(self) -> TrackMetadata | None:
         return self._current
 
     @property
@@ -60,7 +61,7 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     async def play(
         self,
-        track: Track,
+        track: TrackMetadata,
         on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
         self._check_connected()
@@ -113,16 +114,26 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.is_stopped = True
         self.is_paused = False
 
-    async def _build_mixed_source(self, track: Track) -> MixedAudioSource:
+    async def _build_mixed_source(self, track: TrackMetadata) -> MixedAudioSource:
         fg_url = await self._resolve_url(track)
         fg_proc = subprocess.Popen(
             [
                 "ffmpeg",
-                "-reconnect", "1",
-                "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "5",
-                "-i", fg_url,
-                "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                "-reconnect",
+                "1",
+                "-reconnect_streamed",
+                "1",
+                "-reconnect_delay_max",
+                "5",
+                "-i",
+                fg_url,
+                "-f",
+                "s16le",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+                "pipe:1",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -135,11 +146,21 @@ class DiscordPlayer(AudioPlayerProtocol):
                 proc = subprocess.Popen(
                     [
                         "ffmpeg",
-                        "-reconnect", "1",
-                        "-reconnect_streamed", "1",
-                        "-reconnect_delay_max", "5",
-                        "-i", url,
-                        "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                        "-reconnect",
+                        "1",
+                        "-reconnect_streamed",
+                        "1",
+                        "-reconnect_delay_max",
+                        "5",
+                        "-i",
+                        url,
+                        "-f",
+                        "s16le",
+                        "-ar",
+                        "48000",
+                        "-ac",
+                        "2",
+                        "pipe:1",
                     ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
@@ -151,7 +172,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         return MixedAudioSource(procs, vols)
 
     @staticmethod
-    async def _resolve_url(track: Track) -> str:
+    async def _resolve_url(track: TrackMetadata) -> str:
         yt = AsyncYouTube(track.link, "WEB")
         streams = await yt.streams()
         stream = streams.get_audio_only()
@@ -159,7 +180,7 @@ class DiscordPlayer(AudioPlayerProtocol):
             raise ValueError(f"No audio stream available for {track.link}")
         return stream.url
 
-    async def add_background_source(self, track: Track) -> None:
+    async def add_background_source(self, track: TrackMetadata) -> None:
         self.background_tracks.append(track)
         if self._mixed_source is not None:
             try:
@@ -167,11 +188,21 @@ class DiscordPlayer(AudioPlayerProtocol):
                 proc = subprocess.Popen(
                     [
                         "ffmpeg",
-                        "-reconnect", "1",
-                        "-reconnect_streamed", "1",
-                        "-reconnect_delay_max", "5",
-                        "-i", url,
-                        "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1",
+                        "-reconnect",
+                        "1",
+                        "-reconnect_streamed",
+                        "1",
+                        "-reconnect_delay_max",
+                        "5",
+                        "-i",
+                        url,
+                        "-f",
+                        "s16le",
+                        "-ar",
+                        "48000",
+                        "-ac",
+                        "2",
+                        "pipe:1",
                     ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
@@ -180,7 +211,7 @@ class DiscordPlayer(AudioPlayerProtocol):
             except Exception:
                 logger.warning("Failed to add background source for %s", track.link)
 
-    def remove_background_source(self, index: int) -> Track:
+    def remove_background_source(self, index: int) -> TrackMetadata:
         removed = self.background_tracks.pop(index)
         if self._mixed_source is not None:
             proc = self._mixed_source.remove_source(index)
@@ -234,7 +265,9 @@ class DiscordPlayer(AudioPlayerProtocol):
             self.background_volume = self._saved_background_volume
             self._saved_background_volume = None
         self.is_ducking = False
-        logger.info("Unducking: background volume restored to %s", self.background_volume)
+        logger.info(
+            "Unducking: background volume restored to %s", self.background_volume
+        )
 
     def set_voice_client(self, vc: Any) -> None:
         self._voice_client = vc

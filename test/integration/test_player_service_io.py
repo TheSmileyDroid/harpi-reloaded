@@ -20,7 +20,6 @@ class TestPlayerServiceWithRealResolver:
         assert track is not None
         assert track.title == "Me at the zoo"
         assert track.duration is not None
-        assert track.resolved is True
 
     @pytest.mark.asyncio
     async def test_play_two_tracks_skips_correctly(self):
