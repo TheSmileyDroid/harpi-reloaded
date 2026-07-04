@@ -191,6 +191,17 @@ class TestMixedAudioSourceDynamic:
         assert removed is bg_proc
         assert result == fg
 
+    def test_source_count_tracks_add_and_remove(self):
+        proc1 = FakeProcess(_silent_frame())
+        proc2 = FakeProcess(_silent_frame())
+        mixer = MixedAudioSource(processes=[proc1], volumes=[1.0])
+
+        mixer.add_source(proc2, 0.5)
+        assert mixer.source_count == 2
+
+        mixer.remove_source(1)
+        assert mixer.source_count == 1
+
     def test_cleanup_terminates_processes(self):
         frame = _silent_frame()
         proc1 = FakeProcess(frame)
@@ -210,3 +221,75 @@ class TestMixedAudioSourceDynamic:
         mixer.cleanup()
 
         assert proc._killed
+
+
+class TestMixedAudioSourceSourceLifecycle:
+    def test_on_source_finished_fires_once_per_exhausted_source(self):
+        fg_proc = FakeProcess(_frame())
+        bg_proc = FakeProcess(_frame() * 3)
+        finished: list[tuple] = []
+        mixer = MixedAudioSource(
+            processes=[fg_proc, bg_proc],
+            volumes=[1.0, 1.0],
+            on_source_finished=lambda proc, active: finished.append((proc, active)),
+        )
+
+        mixer.read()
+        mixer.read()
+        mixer.read()
+
+        assert finished == [(fg_proc, 1)]
+
+    def test_on_source_finished_reports_zero_active_for_last_source(self):
+        proc = FakeProcess(_frame())
+        finished: list[tuple] = []
+        mixer = MixedAudioSource(
+            processes=[proc],
+            volumes=[1.0],
+            on_source_finished=lambda p, active: finished.append((p, active)),
+        )
+
+        mixer.read()
+        mixer.read()
+
+        assert finished == [(proc, 0)]
+
+    def test_replace_source_swaps_process_and_returns_old(self):
+        old_proc = FakeProcess(_frame())
+        bg_proc = FakeProcess(_silent_frame() * 4)
+        mixer = MixedAudioSource(processes=[old_proc, bg_proc], volumes=[1.0, 1.0])
+        mixer.read()
+        mixer.read()
+
+        frame = _frame(amplitude=0.4)
+        new_proc = FakeProcess(frame * 2)
+        returned = mixer.replace_source(0, new_proc, 1.0)
+        result = mixer.read()
+
+        assert returned is old_proc
+        assert result == frame
+
+    def test_replace_source_applies_new_volume(self):
+        old_proc = FakeProcess(_frame())
+        mixer = MixedAudioSource(processes=[old_proc], volumes=[1.0])
+        mixer.read()
+        mixer.read()
+
+        frame = _frame(amplitude=0.5)
+        new_proc = FakeProcess(frame)
+        mixer.replace_source(0, new_proc, 0.5)
+        result = mixer.read()
+
+        expected = (
+            (np.frombuffer(frame, dtype=np.int16).astype(np.float32) * 0.5)
+            .astype(np.int16)
+            .tobytes()
+        )
+        assert result == expected
+
+    def test_replace_source_rejects_invalid_volume(self):
+        proc = FakeProcess(_frame())
+        mixer = MixedAudioSource(processes=[proc], volumes=[1.0])
+
+        with pytest.raises(ValueError):
+            mixer.replace_source(0, FakeProcess(_frame()), 1.5)

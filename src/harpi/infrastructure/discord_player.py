@@ -36,6 +36,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.background_volume: float = 0.5
         self.is_ducking: bool = False
         self._mixed_source: MixedAudioSource | None = None
+        self._fg_proc: Any = None
 
     @property
     def playing(self) -> TrackMetadata | None:
@@ -65,9 +66,6 @@ class DiscordPlayer(AudioPlayerProtocol):
         on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
         self._check_connected()
-        if self._mixed_source is not None:
-            self._mixed_source.cleanup()
-            self._mixed_source = None
         self._current = track
         self._start_time = time.monotonic()
         self._paused_position = None
@@ -77,9 +75,24 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.is_paused = False
         logger.info("Playing %s (%s)", track.title, track.link)
         try:
-            source = await self._build_mixed_source(track)
-            self._mixed_source = source
-            self._voice_client.play(source, after=lambda e: self._on_finish(e))
+            if (
+                self._mixed_source is not None
+                and self._fg_proc is not None
+                and self._voice_client.is_playing()
+            ):
+                # O mixer segue vivo tocando os fundos: troca só o slot 0
+                # (faixa principal) em vez de recriar tudo.
+                new_proc = await self._spawn_source_process(track)
+                old = self._mixed_source.replace_source(0, new_proc, self.volume)
+                self._fg_proc = new_proc
+                self._kill_process(old)
+            else:
+                if self._mixed_source is not None:
+                    self._mixed_source.cleanup()
+                    self._mixed_source = None
+                source = await self._build_mixed_source(track)
+                self._mixed_source = source
+                self._voice_client.play(source, after=lambda e: self._on_finish(e))
         except Exception:
             logger.exception("Failed to create audio source for %s", track.link)
             raise
@@ -104,19 +117,31 @@ class DiscordPlayer(AudioPlayerProtocol):
     async def stop(self) -> None:
         self._check_connected()
         logger.info("Stopping playback")
+        # Parada manual não é fim de faixa: sem callback de avanço.
+        self._on_finish_callback = None
         self._voice_client.stop()
         if self._mixed_source is not None:
             self._mixed_source.cleanup()
             self._mixed_source = None
+        self._fg_proc = None
         self._current = None
         self._start_time = None
         self._paused_position = None
         self.is_stopped = True
         self.is_paused = False
 
-    async def _build_mixed_source(self, track: TrackMetadata) -> MixedAudioSource:
-        fg_url = await self._resolve_url(track)
-        fg_proc = subprocess.Popen(
+    _FFMPEG_PCM_ARGS = [
+        "-f",
+        "s16le",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
+        "pipe:1",
+    ]
+
+    def _spawn_pcm_process(self, url: str) -> subprocess.Popen:
+        return subprocess.Popen(
             [
                 "ffmpeg",
                 "-reconnect",
@@ -126,50 +151,57 @@ class DiscordPlayer(AudioPlayerProtocol):
                 "-reconnect_delay_max",
                 "5",
                 "-i",
-                fg_url,
-                "-f",
-                "s16le",
-                "-ar",
-                "48000",
-                "-ac",
-                "2",
-                "pipe:1",
+                url,
+                *self._FFMPEG_PCM_ARGS,
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
+
+    async def _spawn_source_process(self, track: TrackMetadata) -> Any:
+        url = await self._resolve_url(track)
+        return self._spawn_pcm_process(url)
+
+    @staticmethod
+    def _kill_process(proc: Any) -> None:
+        try:
+            proc.kill()
+            proc.wait(timeout=1)
+        except Exception:
+            pass
+
+    async def _build_mixed_source(self, track: TrackMetadata) -> MixedAudioSource:
+        fg_proc = await self._spawn_source_process(track)
+        self._fg_proc = fg_proc
         procs = [fg_proc]
         vols = [self.volume]
         for bg in self.background_tracks:
             try:
-                url = await self._resolve_url(bg)
-                proc = subprocess.Popen(
-                    [
-                        "ffmpeg",
-                        "-reconnect",
-                        "1",
-                        "-reconnect_streamed",
-                        "1",
-                        "-reconnect_delay_max",
-                        "5",
-                        "-i",
-                        url,
-                        "-f",
-                        "s16le",
-                        "-ar",
-                        "48000",
-                        "-ac",
-                        "2",
-                        "pipe:1",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                )
-                procs.append(proc)
+                procs.append(await self._spawn_source_process(bg))
                 vols.append(self.background_volume)
             except Exception:
                 logger.warning("Failed to resolve background track %s", bg.link)
-        return MixedAudioSource(procs, vols)
+        return MixedAudioSource(
+            procs, vols, on_source_finished=self._handle_source_finished
+        )
+
+    def _handle_source_finished(self, proc: Any, active_remaining: int) -> None:
+        """Chamado pela thread de áudio quando uma fonte do mixer termina."""
+        if proc is not self._fg_proc:
+            return
+        logger.info("Foreground track finished")
+        self._current = None
+        self._start_time = None
+        self._paused_position = None
+        # Com outras fontes ativas o stream não termina, então o `after` do
+        # discord.py nunca dispararia: o avanço de fila é agendado daqui.
+        # Sem fontes restantes, o `after` assume (via _on_finish).
+        if (
+            active_remaining > 0
+            and self._on_finish_callback is not None
+            and self._loop is not None
+        ):
+            asyncio.run_coroutine_threadsafe(self._on_finish_callback(), self._loop)
 
     @staticmethod
     async def _resolve_url(track: TrackMetadata) -> str:
@@ -186,29 +218,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.background_tracks.append(track)
         if self._mixed_source is not None:
             try:
-                url = await self._resolve_url(track)
-                proc = subprocess.Popen(
-                    [
-                        "ffmpeg",
-                        "-reconnect",
-                        "1",
-                        "-reconnect_streamed",
-                        "1",
-                        "-reconnect_delay_max",
-                        "5",
-                        "-i",
-                        url,
-                        "-f",
-                        "s16le",
-                        "-ar",
-                        "48000",
-                        "-ac",
-                        "2",
-                        "pipe:1",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                )
+                proc = await self._spawn_source_process(track)
                 self._mixed_source.add_source(proc, self.background_volume)
             except Exception:
                 logger.warning("Failed to add background source for %s", track.link)
@@ -216,12 +226,9 @@ class DiscordPlayer(AudioPlayerProtocol):
     def remove_background_source(self, index: int) -> TrackMetadata:
         removed = self.background_tracks.pop(index)
         if self._mixed_source is not None:
-            proc = self._mixed_source.remove_source(index)
-            try:
-                proc.kill()
-                proc.wait(timeout=1)
-            except Exception:
-                pass
+            # Slot 0 do mixer é a faixa principal; fundos começam no 1.
+            proc = self._mixed_source.remove_source(index + 1)
+            self._kill_process(proc)
         return removed
 
     def _on_finish(self, error: Exception | None) -> None:
@@ -232,6 +239,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._mixed_source is not None:
             self._mixed_source.cleanup()
             self._mixed_source = None
+        self._fg_proc = None
         self._current = None
         self._start_time = None
         if self._on_finish_callback is not None and self._loop is not None:
@@ -240,11 +248,20 @@ class DiscordPlayer(AudioPlayerProtocol):
     def set_volume(self, volume: float) -> None:
         validate_volume(volume, "Volume")
         self.volume = volume
+        if self._mixed_source is not None and self._fg_proc is not None:
+            self._mixed_source.set_volume(0, volume)
         logger.info("Volume set to %s", volume)
+
+    def _apply_background_volume(self) -> None:
+        if self._mixed_source is None or self._fg_proc is None:
+            return
+        for i in range(1, self._mixed_source.source_count):
+            self._mixed_source.set_volume(i, self.background_volume)
 
     def set_background_volume(self, volume: float) -> None:
         validate_volume(volume, "Background volume")
         self.background_volume = volume
+        self._apply_background_volume()
         logger.info("Background volume set to %s", volume)
 
     def set_ducking(self, duck_level: float) -> None:
@@ -258,6 +275,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._saved_background_volume = self.background_volume
         self.background_volume = self._duck_level
         self.is_ducking = True
+        self._apply_background_volume()
         logger.info("Ducking: background volume -> %s", self._duck_level)
 
     async def unduck(self) -> None:
@@ -267,6 +285,7 @@ class DiscordPlayer(AudioPlayerProtocol):
             self.background_volume = self._saved_background_volume
             self._saved_background_volume = None
         self.is_ducking = False
+        self._apply_background_volume()
         logger.info(
             "Unducking: background volume restored to %s", self.background_volume
         )

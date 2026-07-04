@@ -123,7 +123,7 @@ class TestDiscordPlayerRealVoice:
         await player.stop()
 
     @pytest.mark.asyncio
-    async def test_on_finish_callback_fires(self, voice_client):
+    async def test_on_finish_fires_when_track_ends_naturally(self, voice_client):
         player = DiscordPlayer(voice_client=voice_client)
         finished = asyncio.Event()
 
@@ -137,7 +137,21 @@ class TestDiscordPlayerRealVoice:
             source=Source.YOUTUBE,
         )
         await player.play(track, on_finish=on_finish)
+
+        await asyncio.wait_for(finished.wait(), timeout=60.0)
+        assert player.playing is None
+
+    @pytest.mark.asyncio
+    async def test_stop_does_not_fire_on_finish(self, voice_client, test_track):
+        player = DiscordPlayer(voice_client=voice_client)
+        calls: list[int] = []
+
+        async def on_finish():
+            calls.append(1)
+
+        await player.play(test_track, on_finish=on_finish)
         await asyncio.sleep(1)
 
         await player.stop()
-        await asyncio.wait_for(finished.wait(), timeout=5.0)
+        await asyncio.sleep(2)
+        assert calls == []
