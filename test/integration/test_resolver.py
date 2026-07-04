@@ -56,3 +56,19 @@ class TestYoutubeResolver:
         resolver = YoutubeResolver()
         with pytest.raises(InvalidLinkError):
             await resolver.resolve("")
+
+
+@pytest.mark.integration
+class TestYoutubeResolverStream:
+    """Testa resolve_stream com chamadas HTTP reais ao YouTube."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_stream_returns_playable_url(self):
+        from harpi.infrastructure.youtube_resolver import YoutubeResolver
+
+        resolver = YoutubeResolver()
+        track = await resolver.resolve("https://youtu.be/M8J9zHyyUYc")
+        url = await resolver.resolve_stream(track)
+
+        assert url.startswith("https://")
+        assert "googlevideo" in url

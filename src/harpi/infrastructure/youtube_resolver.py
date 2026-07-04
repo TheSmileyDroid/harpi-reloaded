@@ -39,6 +39,30 @@ class YoutubeResolver(AudioResolverProtocol):
             source=Source.YOUTUBE,
         )
 
+    async def resolve_stream(self, track: TrackMetadata) -> str:
+        try:
+            # WEB retorna URLs SABR que o FFmpeg não consegue abrir; ANDROID_VR
+            # serve stream direto sem exigir PO Token.
+            yt = AsyncYouTube(track.link, "ANDROID_VR")
+        except RegexMatchError as e:
+            raise InvalidLinkError(str(e)) from e
+
+        try:
+            streams = await asyncio.wait_for(yt.streams(), timeout=self.TIMEOUT)
+        except asyncio.TimeoutError as e:
+            raise ResolutionTimeoutError(
+                f"Stream resolution timed out after {self.TIMEOUT}s"
+            ) from e
+        except (VideoUnavailable, VideoPrivate, RegexMatchError) as e:
+            raise InvalidLinkError(str(e)) from e
+        except (MaxRetriesExceeded, OSError) as e:
+            raise NetworkError(str(e)) from e
+
+        stream = streams.get_audio_only()
+        if stream is None:
+            raise InvalidLinkError(f"No audio stream available for {track.link}")
+        return stream.url
+
     async def _fetch_metadata(self, link: str) -> tuple[str | None, int | None, str]:
         try:
             yt = AsyncYouTube(link, "ANDROID_VR")
