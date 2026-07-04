@@ -1,8 +1,8 @@
 # Harpi Reloaded
 
-Bot de Discord para mesas de TTRPG: toca música do YouTube, mescla **sons de fundo**
-com **ducking automático** (o fundo abaixa quando a música principal toca) e gerencia
-fila com modos de loop — tudo construído com Arquitetura Limpa e TDD.
+Bot de Discord para mesas de TTRPG: toca música do YouTube, mescla sons de fundo com
+ducking automático (o fundo abaixa quando a música principal toca) e gerencia a fila
+com modos de loop. Construído com Arquitetura Limpa e TDD.
 
 Remake do [Harpi](https://github.com/TheSmileyDroid/harpi) original, reescrito do zero
 com foco em estabilidade e teste automatizado.
@@ -21,7 +21,7 @@ No Discord (prefixo padrão `-`):
 
 | Comando | Efeito |
 |---|---|
-| `-play <link>` | Toca / enfileira uma música do YouTube |
+| `-play <link>` | Toca ou enfileira uma música do YouTube |
 | `-queue` | Mostra a fila e o modo de loop |
 | `-loop [off\|track\|queue]` | Alterna o modo de loop |
 | `-skip` / `-pause` / `-resume` / `-stop` | Controle de reprodução |
@@ -31,22 +31,22 @@ No Discord (prefixo padrão `-`):
 
 ## Testes
 
-Pirâmide com três níveis (ver [AGENTS.md](AGENTS.md) para as regras completas):
+Pirâmide com três níveis (as regras completas estão no [AGENTS.md](AGENTS.md)):
 
 ```bash
-uv run pytest test/unit -v          # 280 testes — domain + application com fakes (~1s)
-uv run pytest test/integration -v   # 13 testes — IO real (YouTube, FFmpeg, voz do Discord)
-uv run pytest test/e2e -v           # 1 teste  — jornada completa de usuário
+uv run pytest test/unit -v          # 280 testes: domain + application com fakes (~1s)
+uv run pytest test/integration -v   # 13 testes: IO real (YouTube, FFmpeg, voz do Discord)
+uv run pytest test/e2e -v           # 1 teste: jornada completa de usuário
 uv run pytest test/                 # tudo + relatório de cobertura (88%)
 ```
 
-Os testes de integração/e2e exigem `DISCORD_TOKEN`, `TEST_GUILD_ID` e
-`TEST_VOICE_CHANNEL_ID` no ambiente — sem eles, são pulados automaticamente.
+Os testes de integração e e2e exigem `DISCORD_TOKEN`, `TEST_GUILD_ID` e
+`TEST_VOICE_CHANNEL_ID` no ambiente. Sem essas variáveis, são pulados automaticamente.
 
-Qualidade da suíte verificada com **teste de mutação**:
+A qualidade da suíte é verificada com teste de mutação:
 
 ```bash
-uv run mutmut run    # 201/201 mutantes mortos (100% kill rate)
+uv run mutmut run    # 201/201 mutantes mortos
 ```
 
 Suíte completa de verificação (type check + lint + dead code + testes):
@@ -57,11 +57,11 @@ uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv r
 
 ## Arquitetura
 
-Arquitetura Limpa em três camadas (+ composition root) — detalhes em
+Arquitetura Limpa em três camadas mais o composition root. Os detalhes estão em
 [docs/architecture.md](docs/architecture.md):
 
 ```
-domain/          entidades puras (Queue, Background, LoopMode, volume) — zero deps
+domain/          entidades puras (Queue, Background, LoopMode, volume), sem dependências
 application/     casos de uso (PlayerService, comandos) + Portas (Protocol)
 infrastructure/  adaptadores (YoutubeResolver, DiscordPlayer, mixagem numpy/FFmpeg)
 ```
