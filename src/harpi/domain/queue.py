@@ -9,10 +9,10 @@ class Queue:
         self._loop_mode: LoopMode = LoopMode.OFF
 
     def add_track(self, track: TrackMetadata | list[TrackMetadata]) -> None:
-        if isinstance(track, list):
-            self._queue.extend(track)
-        else:
+        if isinstance(track, TrackMetadata):
             self._queue.append(track)
+        else:
+            self._queue.extend(track)
 
     def clear_tracks(self) -> None:
         self._queue.clear()

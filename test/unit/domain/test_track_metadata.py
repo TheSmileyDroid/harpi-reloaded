@@ -134,7 +134,7 @@ class TestTrackMetadataImmutability:
     def test_track_metadata_is_frozen(self):
         metadata = TrackMetadata(source=Source.YOUTUBE, link="https://youtu.be/abc")
         with pytest.raises(Exception):  # dataclass frozen raises FrozenInstanceError
-            metadata.title = "New Title"
+            metadata.title = "New Title"  # ty: ignore[invalid-assignment]
 
 
 class TestValidateVolumeBVA:
