@@ -43,7 +43,7 @@ uv run pytest test/                 # tudo + relatório de cobertura (88%)
 Os testes de integração e e2e exigem `DISCORD_TOKEN`, `TEST_GUILD_ID` e
 `TEST_VOICE_CHANNEL_ID` no ambiente. Sem essas variáveis, são pulados automaticamente.
 
-A qualidade da suíte é verificada com teste de mutação:
+O mutmut verifica a qualidade da própria suíte:
 
 ```bash
 uv run mutmut run    # 201/201 mutantes mortos

@@ -8,7 +8,7 @@ A regra central da Arquitetura Limpa: camadas internas nunca conhecem classes de
 
 ## Domain (Entidades)
 
-Classes de dados e regras de negócio, livres de qualquer tecnologia: nenhum import externo, nem de framework. São o coração do sistema e o alvo principal dos testes de unidade (incluindo teste de mutação).
+Classes de dados e regras de negócio, livres de qualquer tecnologia: nenhum import externo, nem de framework. É a camada onde os testes de unidade e o teste de mutação se concentram.
 
 - **TrackMetadata**: Valor imutável (`frozen dataclass`) com os metadados de uma música (título, duração, link, origem). Deriva `source_id` a partir do link conforme a origem.
 - **BackgroundTrackId**: Value object (wrapper sobre UUID) que identifica de forma única cada entrada de áudio de fundo.
@@ -61,7 +61,7 @@ Traduzem entre o mundo externo (Discord, FFmpeg, pytubefix, numpy) e as camadas 
 
 - **YoutubeResolver**: Implementa `AudioResolverProtocol`. Extrai metadados via `pytubefix` e traduz os erros da biblioteca para as exceções da aplicação.
 - **DiscordPlayer**: Implementa `AudioPlayerProtocol`. Resolve a URL de stream, cria os subprocessos FFmpeg (PCM s16le 48kHz estéreo) e envia o áudio ao canal de voz via `discord.py`. Controla pausa, posição, volumes e ducking.
-- **MixedAudioSource**: `discord.AudioSource` que mescla múltiplos streams PCM (faixa principal e fundos) com numpy, aplicando os fatores de volume por source. É a fronteira de mixagem do sistema.
+- **MixedAudioSource**: `discord.AudioSource` que mescla múltiplos streams PCM (faixa principal e fundos) com numpy, aplicando os fatores de volume por source. Toda a mixagem do sistema acontece nessa classe.
 - **CommandRouter**: Faz o parse das mensagens (prefixo `-`), consulta o registry de comandos e despacha para o handler. Gera o `-help` a partir do registry.
 - **HarpiBot** (`discord_bot.py`): Composition root. Instancia as implementações concretas, injeta nas Portas, mantém o estado por servidor (um `PlayerService`/`CommandRouter` por guild) e garante a conexão de voz para comandos que exigem canal.
 
