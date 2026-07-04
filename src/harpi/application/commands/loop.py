@@ -3,7 +3,12 @@ from harpi.application.player_service import PlayerService
 from harpi.domain.loop_mode import LoopMode
 
 
-@register("loop", guild_only=True, voice=True)
+@register(
+    "loop",
+    guild_only=True,
+    voice=True,
+    description="define o loop da fila: off, track ou queue",
+)
 async def handle_loop(service: PlayerService, args: str) -> str:
     mode_str = args.strip().lower()
     if not mode_str:

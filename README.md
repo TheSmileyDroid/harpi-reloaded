@@ -26,7 +26,8 @@ No Discord (prefixo padrão `-`):
 | `-loop [off\|track\|queue]` | Alterna o modo de loop |
 | `-skip` / `-pause` / `-resume` / `-stop` | Controle de reprodução |
 | `-rm <índice>` | Remove música da fila |
-| `-bg <links>` / `-bgadd <link>` / `-bgrm <índice>` | Sons de fundo mixados |
+| `-bg <links>` / `-bgadd <link>` / `-bgrm <índice>` | Sons de fundo mixados, em loop até serem removidos |
+| `-help` | Lista os comandos com descrição |
 | `-volume <0..1>` / `-bgvolume <0..1>` / `-duck <0..1>` | Volumes e ducking |
 
 ## Testes

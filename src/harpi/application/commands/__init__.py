@@ -15,6 +15,7 @@ class CommandHandler:
     func: Callable[[PlayerService, str], Awaitable[str | EmbedData]]
     guild_only: bool = False
     voice: bool = False
+    description: str = ""
 
 
 Response = str | EmbedData
@@ -26,9 +27,12 @@ def register(
     name: str,
     guild_only: bool = False,  # pragma: no mutate (trampoline artifact)
     voice: bool = False,  # pragma: no mutate (trampoline artifact)
+    description: str = "",  # pragma: no mutate (trampoline artifact)
 ) -> Callable[[Handler], Handler]:
     def decorator(func: Handler) -> Handler:
-        _registry[name] = CommandHandler(func=func, guild_only=guild_only, voice=voice)
+        _registry[name] = CommandHandler(
+            func=func, guild_only=guild_only, voice=voice, description=description
+        )
         return func
 
     return decorator

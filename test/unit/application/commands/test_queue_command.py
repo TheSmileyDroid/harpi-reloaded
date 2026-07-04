@@ -197,6 +197,26 @@ class TestRegistry:
         assert "bgadd" in handlers
         assert "bgrm" in handlers
 
+    async def test_register_stores_description(self):
+        from harpi.application.commands import register, get_handlers
+
+        @register("__desc_test__", description="faz algo útil")
+        async def _desc_handler(service, args: str) -> str:
+            return "ok"
+
+        handlers = get_handlers()
+        assert handlers["__desc_test__"].description == "faz algo útil"
+
+    async def test_register_default_description_is_empty(self):
+        from harpi.application.commands import register, get_handlers
+
+        @register("__no_desc_test__")
+        async def _no_desc_handler(service, args: str) -> str:
+            return "ok"
+
+        handlers = get_handlers()
+        assert handlers["__no_desc_test__"].description == ""
+
     async def test_register_default_voice_is_false(self):
         from harpi.application.commands import register, get_handlers
 

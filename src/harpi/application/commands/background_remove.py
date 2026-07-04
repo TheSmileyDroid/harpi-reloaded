@@ -2,7 +2,12 @@ from harpi.application.commands import register
 from harpi.application.player_service import PlayerService
 
 
-@register("bgrm", guild_only=True, voice=True)
+@register(
+    "bgrm",
+    guild_only=True,
+    voice=True,
+    description="remove o som de fundo <n> mostrado no queue",
+)
 async def handle_bgrm(service: PlayerService, args: str) -> str:
     index_str = args.strip()
     if not index_str:

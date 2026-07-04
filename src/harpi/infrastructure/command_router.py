@@ -34,6 +34,9 @@ class CommandRouter:
         cmd_name = parts[0].lower()
         args = parts[1] if len(parts) > 1 else ""
 
+        if cmd_name == "help":
+            return self._help()
+
         handler = self._handlers.get(cmd_name)
 
         if handler is None:
@@ -52,5 +55,10 @@ class CommandRouter:
         return handler is not None and handler.voice
 
     def _help(self) -> str:
-        cmds = ", ".join(f"{self._prefix}{c}" for c in self._handlers)
-        return f"Comandos disponíveis: {cmds}. Exemplo: {self._prefix}play <url>"
+        lines = [f"Comandos (prefixo {self._prefix}):"]
+        for name, handler in self._handlers.items():
+            if handler.description:
+                lines.append(f"{self._prefix}{name}: {handler.description}")
+            else:
+                lines.append(f"{self._prefix}{name}")
+        return "\n".join(lines)

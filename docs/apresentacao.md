@@ -33,10 +33,10 @@ Sequência no Discord (prefixo `-`):
 1. `-play <link>`, a música começa
 2. `-queue` mostra a fila e o modo de loop
 3. `-loop queue`
-4. `-bgadd <link>`, o som de fundo entra mixado por cima da música
+4. `-bgadd <link>`, o som de fundo entra mixado por cima da música (e fica em loop)
 5. `-duck 0.1`, dá para ouvir o fundo abaixar
 6. `-volume 0.5`, `-skip`, `-stop`
-7. `-help` no final (é gerado a partir do registry de comandos)
+7. `-help` no final (nomes e descrições vêm do registry de comandos)
 
 Plano B se a rede falhar: rodar `uv run pytest test/ -v` e mostrar o e2e
 `test_user_plays_track_and_stops`, que sobe o bot num canal de voz de verdade.

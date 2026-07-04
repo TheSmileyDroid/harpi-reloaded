@@ -2,7 +2,12 @@ from harpi.application.commands import register
 from harpi.application.player_service import PlayerService
 
 
-@register("rm", guild_only=True, voice=True)
+@register(
+    "rm",
+    guild_only=True,
+    voice=True,
+    description="remove da fila a música <n> mostrada no queue",
+)
 async def handle_rm(service: PlayerService, args: str) -> str:
     index_str = args.strip()
     if not index_str:

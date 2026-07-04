@@ -140,27 +140,36 @@ class DiscordPlayer(AudioPlayerProtocol):
         "pipe:1",
     ]
 
-    def _spawn_pcm_process(self, url: str) -> subprocess.Popen:
+    @staticmethod
+    def _popen(args: list[str]) -> subprocess.Popen:
         return subprocess.Popen(
-            [
-                "ffmpeg",
-                "-reconnect",
-                "1",
-                "-reconnect_streamed",
-                "1",
-                "-reconnect_delay_max",
-                "5",
-                "-i",
-                url,
-                *self._FFMPEG_PCM_ARGS,
-            ],
+            args,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
 
-    async def _spawn_source_process(self, track: TrackMetadata) -> Any:
+    def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+        args = ["ffmpeg"]
+        if loop:
+            args += ["-stream_loop", "-1"]
+        args += [
+            "-reconnect",
+            "1",
+            "-reconnect_streamed",
+            "1",
+            "-reconnect_delay_max",
+            "5",
+            "-i",
+            url,
+            *self._FFMPEG_PCM_ARGS,
+        ]
+        return self._popen(args)
+
+    async def _spawn_source_process(
+        self, track: TrackMetadata, loop: bool = False
+    ) -> Any:
         url = await self._resolve_url(track)
-        return self._spawn_pcm_process(url)
+        return self._spawn_pcm_process(url, loop=loop)
 
     @staticmethod
     def _kill_process(proc: Any) -> None:
@@ -177,7 +186,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         vols = [self.volume]
         for bg in self.background_tracks:
             try:
-                procs.append(await self._spawn_source_process(bg))
+                procs.append(await self._spawn_source_process(bg, loop=True))
                 vols.append(self.background_volume)
             except Exception:
                 logger.warning("Failed to resolve background track %s", bg.link)
@@ -218,7 +227,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.background_tracks.append(track)
         if self._mixed_source is not None:
             try:
-                proc = await self._spawn_source_process(track)
+                proc = await self._spawn_source_process(track, loop=True)
                 self._mixed_source.add_source(proc, self.background_volume)
             except Exception:
                 logger.warning("Failed to add background source for %s", track.link)

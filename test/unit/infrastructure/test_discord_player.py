@@ -324,7 +324,9 @@ def make_streamed_player(voice_client):
 
     def _make(procs: list[FakeStreamProcess]):
         class StreamedDiscordPlayer(DiscordPlayer):
-            async def _spawn_source_process(self, track: TrackMetadata) -> Any:
+            async def _spawn_source_process(
+                self, track: TrackMetadata, loop: bool = False
+            ) -> Any:
                 return procs.pop(0)
 
         return StreamedDiscordPlayer(voice_client=voice_client)
@@ -484,3 +486,64 @@ class TestDiscordPlayerTrackEnd:
         await asyncio.sleep(0.05)
 
         assert calls == []
+
+
+class TestDiscordPlayerBackgroundLooping:
+    async def test_background_added_mid_playback_spawns_with_looping(
+        self, voice_client, track, bg_track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        spawned: list[tuple[str, bool]] = []
+
+        class RecordingPlayer(DiscordPlayer):
+            async def _spawn_source_process(
+                self, track: TrackMetadata, loop: bool = False
+            ) -> Any:
+                spawned.append((track.link, loop))
+                return FakeStreamProcess(3, value=0)
+
+        player = RecordingPlayer(voice_client=voice_client)
+        await player.play(track)
+        await player.add_background_source(bg_track)
+
+        assert spawned == [(track.link, False), (bg_track.link, True)]
+
+    async def test_background_present_before_play_spawns_with_looping(
+        self, voice_client, track, bg_track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        spawned: list[tuple[str, bool]] = []
+
+        class RecordingPlayer(DiscordPlayer):
+            async def _spawn_source_process(
+                self, track: TrackMetadata, loop: bool = False
+            ) -> Any:
+                spawned.append((track.link, loop))
+                return FakeStreamProcess(3, value=0)
+
+        player = RecordingPlayer(voice_client=voice_client)
+        await player.add_background_source(bg_track)
+        await player.play(track)
+
+        assert spawned == [(track.link, False), (bg_track.link, True)]
+
+    def test_spawn_pcm_process_adds_stream_loop_flag(self):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        recorded: list[list[str]] = []
+
+        class RecordingPopenPlayer(DiscordPlayer):
+            @staticmethod
+            def _popen(args):
+                recorded.append(args)
+
+        player = RecordingPopenPlayer()
+        player._spawn_pcm_process("http://x", loop=True)
+        player._spawn_pcm_process("http://x", loop=False)
+
+        looped, plain = recorded
+        assert "-stream_loop" in looped
+        assert looped.index("-stream_loop") < looped.index("-i")
+        assert "-stream_loop" not in plain

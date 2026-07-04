@@ -63,6 +63,6 @@ def _build_queue_embed(service: PlayerService) -> str | EmbedData:
     )
 
 
-@register("queue")
+@register("queue", description="mostra a música atual, a fila e os sons de fundo")
 async def handle_queue(service: PlayerService, args: str) -> Response:
     return _build_queue_embed(service)

@@ -88,3 +88,25 @@ class TestCommandRouterCustomPrefix:
         router = CommandRouter(player_service=svc, prefix="!")
         response = await router.dispatch("-play https://youtu.be/abc")
         assert response is None
+
+
+class TestCommandRouterHelp:
+    @pytest.mark.asyncio
+    async def test_help_command_lists_all_commands_with_descriptions(
+        self, router: CommandRouter
+    ):
+        response = await router.dispatch("-help")
+        assert response is not None
+        msg = _as_str(response)
+        lines = msg.split("\n")
+
+        assert len(lines) > 10
+        assert any(line.startswith("-play: ") for line in lines)
+        assert any(line.startswith("-bgadd: ") for line in lines)
+
+    @pytest.mark.asyncio
+    async def test_help_explains_background_looping(self, router: CommandRouter):
+        response = await router.dispatch("-help")
+        assert response is not None
+        msg = _as_str(response)
+        assert "loop" in msg.lower()

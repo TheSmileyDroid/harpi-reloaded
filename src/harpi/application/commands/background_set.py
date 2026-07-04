@@ -2,7 +2,12 @@ from harpi.application.commands import register
 from harpi.application.player_service import PlayerService
 
 
-@register("bg", guild_only=True, voice=True)
+@register(
+    "bg",
+    guild_only=True,
+    voice=True,
+    description="substitui todos os sons de fundo pelos links dados",
+)
 async def handle_bg(service: PlayerService, args: str) -> str:
     links = args.strip().split()
     if not links:
