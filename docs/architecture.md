@@ -2,40 +2,44 @@
 
 Referência: [Arquitetura Limpa — Engenharia de Software Moderna](https://engsoftmoderna.info/artigos/arquitetura-limpa.html)
 
-A regra central da Arquitetura Limpa: camadas internas nunca conhecem classes de camadas externas. Quando uma classe interna precisa de algo externo (tocar áudio, resolver metadados, etc.), ela depende de uma **porta** (interface) definida na própria camada interna, e é a camada externa que implementa essa porta.
+A regra central da Arquitetura Limpa: camadas internas nunca conhecem classes de camadas externas. Quando uma classe interna precisa de algo externo (tocar áudio, resolver metadados, etc.), ela depende de uma **porta** (interface) definida em camada interna, e é a camada externa que implementa essa porta.
 
 ---
 
 ## Domain (Entidades)
 
-Classes de dados + regras de negócio **genéricas**, reutilizáveis em outros sistemas. Livres de qualquer tecnologia.
+Classes de dados + regras de negócio, **livres de qualquer tecnologia** — nenhum import externo, nem de framework. São o coração do sistema e o alvo principal dos testes de unidade (incluindo teste de mutação).
 
-- **TrackMetadata**: Representação dos metadados de uma música (título, duração, URL de origem, etc.).
+- **TrackMetadata**: Valor imutável (`frozen dataclass`) com os metadados de uma música (título, duração, link, origem). Deriva `source_id` a partir do link conforme a origem.
 - **BackgroundTrackId**: Value object (wrapper sobre UUID) que identifica de forma única cada entrada de áudio de fundo.
-- **LoopMode**: Enum que define os modos de loop (`TRACK`, `QUEUE`, `OFF`).
-- **Volume**: Função utilitária `validate_volume()` e constantes `MIN_VOLUME`/`MAX_VOLUME`. Regra de negócio genérica de validação de faixa 0.0–1.0.
+- **LoopMode**: Enum com os modos de loop (`TRACK`, `QUEUE`, `OFF`).
+- **Volume**: `validate_volume()` e constantes `MIN_VOLUME`/`MAX_VOLUME`. Regra de validação da faixa 0.0–1.0, testada com Análise de Valor Limite.
+- **Queue**: Fila de músicas (`TrackMetadata`). Controla adição/remoção e decide a próxima música conforme o `LoopMode` — a regra de negócio mais rica do sistema.
+- **Background**: Coleção de `BackgroundEntry` (id + metadados + loop próprio). Gerencia os áudios de fundo com identidade por `BackgroundTrackId`.
+- **Guild**: Agregado do estado de um servidor Discord: mantém a `Queue` e o `Background` daquele servidor.
 
-> **Nota:** `Queue`, `Guild` e `Background` são **Casos de Uso** (ver abaixo), pois contêm regras específicas deste sistema (modos de loop por fila, gerenciamento de background por servidor, etc.).
+> **Nota:** `Queue`, `Guild` e `Background` moram no Domain porque são livres de tecnologia e expressam regras de negócio próprias (looping, identidade, agregação por servidor). A orquestração dessas entidades com o mundo externo — essa sim específica da aplicação — fica no `PlayerService`, na camada de Application.
 
 ---
 
 ## Application (Casos de Uso)
 
-Regras de negócio **específicas** deste sistema. Orquestram as Entidades e chamam as Portas. Podem depender de Entidades, mas Entidades nunca dependem de Casos de Uso.
+Orquestra as Entidades e aciona as Portas. Depende apenas do Domain; nunca de infraestrutura.
 
 ### Portas (Interfaces)
 
-Definidas na camada de Casos de Uso para que os use cases possam acionar funcionalidades externas sem violar a Regra de Dependência. Implementadas pelos Adaptadores correspondentes.
+Definidas em `application/ports/` como `Protocol` para que os casos de uso acionem funcionalidades externas sem violar a Regra de Dependência. Implementadas pelos Adaptadores; nos testes de unidade, por **fakes escritos à mão** (`FakeResolver`, `FakePlayer`).
 
-- **AudioResolverProtocol**: `resolve(link) -> TrackMetadata`. Abstrai a resolução de metadados a partir de uma fonte (YouTube, Spotify, etc.). A estratégia que escolhe qual resolver usar para uma dada entrada é regra de negócio e deve operar sobre essa interface, não sobre classes concretas como `YoutubeResolver`.
-- **AudioPlayerProtocol**: Abstrai o envio de áudio para o canal de voz e a conexão ao canal do usuário (`play`, `pause`, `connect`, `disconnect`), permitindo que os Casos de Uso não conheçam `DiscordPlayer` diretamente.
+- **AudioResolverProtocol**: `resolve(link) -> TrackMetadata` e `resolve_stream(track) -> str`. Abstrai a resolução de metadados e de URL de stream a partir de uma fonte (YouTube, etc.).
+- **AudioPlayerProtocol**: Abstrai o playback no canal de voz (`play`, `pause`, `resume`, `stop`, volumes, ducking, background sources), permitindo que os Casos de Uso não conheçam `DiscordPlayer`.
 
 ```python
 class AudioResolverProtocol(Protocol):
     async def resolve(self, link: str) -> TrackMetadata: ...
+    async def resolve_stream(self, track: TrackMetadata) -> str: ...
 
 class AudioPlayerProtocol(Protocol):
-    async def play(self, track: TrackMetadata, on_finish: Callable[[], Awaitable[None]] | None = None) -> None: ...
+    async def play(self, track: TrackMetadata, on_finish=None) -> None: ...
     async def pause(self) -> None: ...
     async def resume(self) -> None: ...
     async def stop(self) -> None: ...
@@ -44,33 +48,28 @@ class AudioPlayerProtocol(Protocol):
 
 ### Classes
 
-- **PlayerService**: Orquestrador central. Recebe as portas `AudioResolverProtocol` e `AudioPlayerProtocol` por injeção de dependência. Coordena a fila, o playback e o estado por servidor.
-- **TrackFactory**: Chama `AudioResolverProtocol.resolve()` → retorna `TrackMetadata`. Separa a resolução de links da orquestração de playback.
-- **Queue**: Fila de músicas (`TrackMetadata`) por servidor. Controla adição, remoção e qual a próxima música a tocar conforme o modo de looping.
-- **Background**: Gerencia áudios de fundo por servidor. Cada entrada (`BackgroundEntry`) possui seu próprio modo de loop.
-- **Guild**: Dados e estado do servidor; mantém a `Queue` e o `Background`.
-- **Command**: Cada comando recebe o contexto da `Guild` e os argumentos, orquestra as Entidades e aciona as Portas.
+- **PlayerService**: Orquestrador central. Recebe as portas por injeção de dependência. Coordena fila, playback, volumes, ducking e o encadeamento de faixas (`on_track_end` decide a próxima conforme o `LoopMode`).
+- **TrackFactory**: Chama `AudioResolverProtocol.resolve()` → `TrackMetadata`. Separa resolução de links da orquestração de playback.
+- **Commands** (`application/commands/`): Um arquivo por comando (`play`, `skip`, `pause`, `resume`, `stop`, `volume`, `loop`, `rm`, `queue`, `background_*`). Funções async registradas via decorator `@register("nome")` num registry; cada handler recebe o `PlayerService` e os argumentos e devolve `str` ou `EmbedData`.
+- **Exceptions**: Exceções da aplicação (`InvalidLinkError`, `NetworkError`, `ResolutionTimeoutError`), que os adaptadores traduzem a partir de erros de bibliotecas externas.
 
 ---
 
-## Adapters
+## Adapters (Infrastructure)
 
-Classes que traduzem entre o mundo externo (Discord, FFmpeg, yt-dlp, numpy) e as camadas internas. Implementam as Portas definidas na camada de Casos de Uso.
+Traduzem entre o mundo externo (Discord, FFmpeg, pytubefix, numpy) e as camadas internas. Implementam as Portas. Todo acoplamento a framework fica confinado aqui.
 
-- **YoutubeResolver**: Implementa `AudioResolverProtocol`. Extrai metadados de uma música do YouTube. Adaptador para a biblioteca `pytubefix`.
-- **CompositeSourceResolver**: Implementa `AudioResolverProtocol`. Agrega múltiplos resolvers concretos (YouTube, Spotify, etc.) e delega para o adequado.
-- **DiscordPlayer**: Implementa `AudioPlayerProtocol`. Envia áudio para o canal de Discord conectado. Conecta-se ao canal do usuário caso necessário.
-- **FFmpegSource**: Implementa uma abstração de source de áudio via subprocesso FFmpeg, produzindo PCM raw.
-- **Mixer**: Mescla múltiplos sources de áudio em um único stream using numpy. Aplica os fatores de volume/fade calculados pelas entidades sobre os buffers — não decide valores, apenas executa a mixagem.
-- **CommandRouter**: Coleta as mensagens de um canal Discord e despacha para o `Command` correspondente.
+- **YoutubeResolver**: Implementa `AudioResolverProtocol`. Extrai metadados via `pytubefix`, traduzindo erros da biblioteca para as exceções da aplicação.
+- **DiscordPlayer**: Implementa `AudioPlayerProtocol`. Resolve a URL de stream, cria os subprocessos FFmpeg (PCM s16le 48kHz estéreo) e envia o áudio ao canal de voz via `discord.py`. Controla pausa, posição, volumes e ducking.
+- **MixedAudioSource**: `discord.AudioSource` que mescla múltiplos streams PCM (faixa principal + fundos) com numpy, aplicando os fatores de volume por source. É a fronteira de mixagem do sistema.
+- **CommandRouter**: Faz o parse das mensagens (prefixo `-`), consulta o registry de comandos e despacha para o handler; gera o `-help` a partir do registry.
+- **HarpiBot** (`discord_bot.py`): *Composition root*. Instancia as implementações concretas, injeta nas Portas, mantém o estado por servidor (um `PlayerService`/`CommandRouter` por guild) e garante a conexão de voz para comandos que exigem canal.
 
 ---
 
 ## Frameworks Externos / Main
 
-Camada mais externa: bibliotecas, frameworks e o ponto de entrada da aplicação (*composition root*), separado dos Adaptadores.
-
-- **DiscordBot**: *Composition root*. Instancia as implementações concretas (`YoutubeResolver`, `DiscordPlayer`, `FFmpegSource`, `Mixer`) e as injeta nos Casos de Uso através das Portas definidas na camada de Application. É o único arquivo que conhece todas as implementações concretas.
+- **main.py**: Entry point. Carrega configuração (token) e inicia o `HarpiBot`.
 
 ---
 
@@ -82,10 +81,12 @@ Frameworks Externos → Adapters → Application (Casos de Uso) → Domain (Enti
   depende de         depende de      depende de              zero dependências
 ```
 
-- **Domain**: zero dependências externas. Apenas dados e regras de negócio genéricas.
+- **Domain**: zero dependências externas. Apenas dados e regras de negócio.
 - **Application**: depende apenas de Domain. Define as Portas que precisa.
-- **Adapters**: depende de Application (implementa as Portas) e de Domain.
-- **Frameworks Externos**: depende de todos os anteriores. Instancia e conecta tudo.
+- **Adapters**: dependem de Application (implementam as Portas) e de Domain.
+- **Frameworks Externos**: dependem de todos os anteriores. Instanciam e conectam tudo.
+
+Essa regra é o que permite a estratégia de testes do projeto: o Domain e a Application são testados por completo com fakes (sem IO, sem mocks de framework), e os Adapters são verificados por testes de integração contra os serviços reais.
 
 ---
 
@@ -94,37 +95,38 @@ Frameworks Externos → Adapters → Application (Casos de Uso) → Domain (Enti
 ```
 src/harpi/
 ├── domain/                          # Entidades — zero dependências
-│   ├── __init__.py
-│   ├── track_metadata.py            # TrackMetadata
+│   ├── track_metadata.py            # TrackMetadata (+ Source)
 │   ├── background_track_id.py       # Value object (wrapper sobre UUID)
+│   ├── background.py                # Background + BackgroundEntry
+│   ├── guild.py                     # Guild (Queue + Background por servidor)
 │   ├── loop_mode.py                 # LoopMode (TRACK, QUEUE, OFF)
+│   ├── queue.py                     # Queue (fila + regras de looping)
 │   └── volume.py                    # validate_volume(), MIN_VOLUME, MAX_VOLUME
 ├── application/                     # Casos de Uso — define Portas
-│   ├── __init__.py
 │   ├── player_service.py            # Orquestrador central
-│   ├── track_factory.py             # Chama AudioResolverProtocol → TrackMetadata
-│   ├── exceptions.py                # Exceções de domínio da aplicação
+│   ├── track_factory.py             # AudioResolverProtocol → TrackMetadata
+│   ├── exceptions.py                # Exceções da aplicação
+│   ├── ports/
+│   │   └── audio.py                 # AudioResolverProtocol, AudioPlayerProtocol
 │   └── commands/                    # Um arquivo por comando
-│       ├── __init__.py              # Registry de comandos (@register)
-│       ├── play.py
-│       ├── skip.py
-│       ├── pause.py
-│       ├── resume.py
-│       ├── stop.py
-│       ├── volume.py
-│       ├── loop.py
-│       ├── rm.py
-│       ├── background_add.py
-│       ├── background_remove.py
-│       └── background_set.py
-├── infrastructure/                  # Adaptadores — implementa Portas
-│   ├── __init__.py
-│   ├── youtube_resolver.py          # Implementa AudioResolverProtocol
-│   ├── composite_source_resolver.py # Implementa AudioResolverProtocol (agrega)
-│   ├── ffmpeg_source.py             # Source de áudio via FFmpeg
-│   ├── mixer.py                     # Mixagem via numpy
-│   ├── discord_player.py            # Implementa AudioPlayerProtocol
-│   ├── command_router.py            # Traduz mensagens → Commands
-│   └── discord_bot.py               # Composition root
-└── main.py                          # Entry point
+│       ├── __init__.py              # Registry (@register) + EmbedData/Response
+│       ├── play.py … stop.py        # play, skip, pause, resume, stop
+│       ├── volume.py, loop.py, rm.py, queue.py
+│       └── background_add.py, background_remove.py, background_set.py
+└── infrastructure/                  # Adaptadores — implementam Portas
+    ├── youtube_resolver.py          # Implementa AudioResolverProtocol
+    ├── discord_player.py            # Implementa AudioPlayerProtocol
+    ├── mixed_audio_source.py        # Mixagem PCM via numpy (discord.AudioSource)
+    ├── command_router.py            # Mensagens → Commands
+    └── discord_bot.py               # HarpiBot — composition root
+main.py                              # Entry point
 ```
+
+---
+
+## Evolução planejada
+
+Refinos já mapeados, não necessários para a corretude atual:
+
+- **CompositeSourceResolver** (SMI-25): agregador de resolvers para múltiplas fontes. Só ganha valor quando houver um segundo resolver concreto (SpotifyResolver, SMI-6) — hoje seria generalidade especulativa sobre um único `YoutubeResolver`.
+- **FFmpegSource + Mixer puro** (SMI-23/24): separar o `MixedAudioSource` em um source FFmpeg reutilizável e um mixer numpy independente de `discord.py`, aumentando a testabilidade da mixagem em unidade.
