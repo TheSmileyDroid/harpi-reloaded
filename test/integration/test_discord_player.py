@@ -4,6 +4,7 @@ import pytest
 
 from harpi.domain.track_metadata import TrackMetadata, Source
 from harpi.infrastructure.discord_player import DiscordPlayer
+from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
 
 pytestmark = pytest.mark.integration
@@ -79,7 +80,7 @@ def test_track() -> TrackMetadata:
 class TestDiscordPlayerRealVoice:
     @pytest.mark.asyncio
     async def test_play_real_audio_stream(self, voice_client, test_track):
-        player = DiscordPlayer(voice_client=voice_client)
+        player = DiscordPlayer(voice_client=voice_client, resolver=YoutubeResolver())
         await player.play(test_track)
 
         assert player.playing is not None
@@ -96,7 +97,7 @@ class TestDiscordPlayerRealVoice:
 
     @pytest.mark.asyncio
     async def test_pause_resume_real(self, voice_client, test_track):
-        player = DiscordPlayer(voice_client=voice_client)
+        player = DiscordPlayer(voice_client=voice_client, resolver=YoutubeResolver())
         await player.play(test_track)
         await asyncio.sleep(1)
 
@@ -112,7 +113,7 @@ class TestDiscordPlayerRealVoice:
 
     @pytest.mark.asyncio
     async def test_position_updates_during_playback(self, voice_client, test_track):
-        player = DiscordPlayer(voice_client=voice_client)
+        player = DiscordPlayer(voice_client=voice_client, resolver=YoutubeResolver())
         await player.play(test_track)
         await asyncio.sleep(1.5)
 
@@ -124,7 +125,7 @@ class TestDiscordPlayerRealVoice:
 
     @pytest.mark.asyncio
     async def test_on_finish_fires_when_track_ends_naturally(self, voice_client):
-        player = DiscordPlayer(voice_client=voice_client)
+        player = DiscordPlayer(voice_client=voice_client, resolver=YoutubeResolver())
         finished = asyncio.Event()
 
         async def on_finish():
@@ -143,7 +144,7 @@ class TestDiscordPlayerRealVoice:
 
     @pytest.mark.asyncio
     async def test_stop_does_not_fire_on_finish(self, voice_client, test_track):
-        player = DiscordPlayer(voice_client=voice_client)
+        player = DiscordPlayer(voice_client=voice_client, resolver=YoutubeResolver())
         calls: list[int] = []
 
         async def on_finish():

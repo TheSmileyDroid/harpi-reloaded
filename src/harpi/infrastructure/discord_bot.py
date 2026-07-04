@@ -32,7 +32,7 @@ class HarpiBot:
             return self._guild_routers[guild_id]
         if self._resolver is None:
             return None
-        player = DiscordPlayer()
+        player = DiscordPlayer(resolver=self._resolver)
         service = PlayerService(resolver=self._resolver, player=player)
         router = CommandRouter(player_service=service, prefix=self._prefix)
         self._guild_players[guild_id] = player

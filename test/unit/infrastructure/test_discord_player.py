@@ -1,6 +1,9 @@
 from typing import Any
 import pytest
-from harpi.application.ports.audio import AudioPlayerProtocol
+from harpi.application.ports.audio import (
+    AudioPlayerProtocol,
+    AudioResolverProtocol,
+)
 from harpi.domain.track_metadata import TrackMetadata, Source
 
 
@@ -547,3 +550,62 @@ class TestDiscordPlayerBackgroundLooping:
         assert "-stream_loop" in looped
         assert looped.index("-stream_loop") < looped.index("-i")
         assert "-stream_loop" not in plain
+
+
+class TestDiscordPlayerUsesResolver:
+    async def test_play_resolves_stream_url_via_injected_resolver(
+        self, voice_client, track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        class StubResolver(AudioResolverProtocol):
+            async def resolve(self, link: str) -> TrackMetadata:
+                raise AssertionError("play must not call resolve()")
+
+            async def resolve_stream(self, track: TrackMetadata) -> str:
+                return f"http://stream/{track.link}"
+
+        captured: list[str] = []
+
+        class CapturingPlayer(DiscordPlayer):
+            def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+                captured.append(url)
+                return FakeStreamProcess(3, value=0)
+
+        player = CapturingPlayer(voice_client=voice_client, resolver=StubResolver())
+        await player.play(track)
+
+        assert captured == [f"http://stream/{track.link}"]
+
+    async def test_background_resolved_via_injected_resolver(
+        self, voice_client, track, bg_track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        class StubResolver(AudioResolverProtocol):
+            async def resolve(self, link: str) -> TrackMetadata:
+                raise AssertionError("play must not call resolve()")
+
+            async def resolve_stream(self, track: TrackMetadata) -> str:
+                return f"http://stream/{track.link}"
+
+        captured: list[str] = []
+
+        class CapturingPlayer(DiscordPlayer):
+            def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+                captured.append(url)
+                return FakeStreamProcess(3, value=0)
+
+        player = CapturingPlayer(voice_client=voice_client, resolver=StubResolver())
+        await player.play(track)
+        await player.add_background_source(bg_track)
+
+        assert f"http://stream/{bg_track.link}" in captured
+
+    async def test_play_without_resolver_raises(self, voice_client, track):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        player = DiscordPlayer(voice_client=voice_client)
+
+        with pytest.raises(RuntimeError, match="resolver"):
+            await player.play(track)

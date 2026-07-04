@@ -10,6 +10,9 @@ class NoTitleResolver(AudioResolverProtocol):
     async def resolve(self, link: str) -> TrackMetadata:
         return TrackMetadata(link=link, source=Source.YOUTUBE, duration=120)
 
+    async def resolve_stream(self, track: TrackMetadata) -> str:
+        return f"stream://{track.link}"
+
 
 @pytest.fixture
 def service():

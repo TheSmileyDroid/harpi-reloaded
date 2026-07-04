@@ -60,7 +60,7 @@ class AudioPlayerProtocol(Protocol):
 Traduzem entre o mundo externo (Discord, FFmpeg, pytubefix, numpy) e as camadas internas. Implementam as Portas. Todo acoplamento a framework fica confinado aqui.
 
 - **YoutubeResolver**: Implementa `AudioResolverProtocol`. Extrai metadados via `pytubefix` e traduz os erros da biblioteca para as exceções da aplicação.
-- **DiscordPlayer**: Implementa `AudioPlayerProtocol`. Resolve a URL de stream, cria os subprocessos FFmpeg (PCM s16le 48kHz estéreo) e envia o áudio ao canal de voz via `discord.py`. Controla pausa, posição, volumes e ducking.
+- **DiscordPlayer**: Implementa `AudioPlayerProtocol`. Recebe um `AudioResolverProtocol` por injeção e chama `resolve_stream()` para obter a URL de áudio (não conhece YouTube nem `pytubefix`). Cria os subprocessos FFmpeg (PCM s16le 48kHz estéreo), envia o áudio ao canal de voz via `discord.py` e controla pausa, posição, volumes e ducking.
 - **MixedAudioSource**: `discord.AudioSource` que mescla múltiplos streams PCM (faixa principal e fundos) com numpy, aplicando os fatores de volume por source. Toda a mixagem do sistema acontece nessa classe.
 - **CommandRouter**: Faz o parse das mensagens (prefixo `-`), consulta o registry de comandos e despacha para o handler. Gera o `-help` a partir do registry.
 - **HarpiBot** (`discord_bot.py`): Composition root. Instancia as implementações concretas, injeta nas Portas, mantém o estado por servidor (um `PlayerService`/`CommandRouter` por guild) e garante a conexão de voz para comandos que exigem canal.

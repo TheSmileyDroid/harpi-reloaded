@@ -6,9 +6,7 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 
-from pytubefix.async_youtube import AsyncYouTube
-
-from harpi.application.ports.audio import AudioPlayerProtocol
+from harpi.application.ports.audio import AudioPlayerProtocol, AudioResolverProtocol
 from harpi.domain.track_metadata import TrackMetadata
 from harpi.domain.volume import validate_volume
 from harpi.infrastructure.mixed_audio_source import MixedAudioSource
@@ -20,8 +18,10 @@ class DiscordPlayer(AudioPlayerProtocol):
     def __init__(
         self,
         voice_client: Any = None,
+        resolver: AudioResolverProtocol | None = None,
     ):
         self._voice_client = voice_client
+        self._resolver = resolver
         self._current: TrackMetadata | None = None
         self._start_time: float | None = None
         self._paused_position: float | None = None
@@ -168,7 +168,9 @@ class DiscordPlayer(AudioPlayerProtocol):
     async def _spawn_source_process(
         self, track: TrackMetadata, loop: bool = False
     ) -> Any:
-        url = await self._resolve_url(track)
+        if self._resolver is None:
+            raise RuntimeError("No resolver configured for stream resolution")
+        url = await self._resolver.resolve_stream(track)
         return self._spawn_pcm_process(url, loop=loop)
 
     @staticmethod
@@ -211,17 +213,6 @@ class DiscordPlayer(AudioPlayerProtocol):
             and self._loop is not None
         ):
             asyncio.run_coroutine_threadsafe(self._on_finish_callback(), self._loop)
-
-    @staticmethod
-    async def _resolve_url(track: TrackMetadata) -> str:
-        # WEB retorna URLs SABR que o FFmpeg não consegue abrir; ANDROID_VR
-        # serve stream direto sem exigir PO Token.
-        yt = AsyncYouTube(track.link, "ANDROID_VR")
-        streams = await yt.streams()
-        stream = streams.get_audio_only()
-        if stream is None:
-            raise ValueError(f"No audio stream available for {track.link}")
-        return stream.url
 
     async def add_background_source(self, track: TrackMetadata) -> None:
         self.background_tracks.append(track)
