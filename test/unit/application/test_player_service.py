@@ -84,7 +84,6 @@ class TestPlayerServiceSkip:
 
         await svc.skip()
 
-        assert player.is_stopped is False
         assert player.playing == track2
 
     @pytest.mark.asyncio
@@ -136,7 +135,6 @@ class TestPlayerServiceStop:
         await svc.stop()
 
         assert len(svc.queue.tracks) == 0
-        assert player.is_stopped is True
         assert player.playing is None
 
     @pytest.mark.asyncio
@@ -146,7 +144,6 @@ class TestPlayerServiceStop:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.stop()
         assert len(svc.queue.tracks) == 0
-        assert player.is_stopped is True
         assert player.playing is None
 
     @pytest.mark.asyncio
@@ -156,9 +153,7 @@ class TestPlayerServiceStop:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.play("https://youtu.be/abc")
         await svc.stop()
-        assert player.is_stopped is True
         await svc.play("https://youtu.be/def")
-        assert player.is_stopped is False
         assert player.playing is not None
         assert len(svc.queue.tracks) == 1
 
@@ -345,9 +340,10 @@ class TestPlayerServiceBackgroundSet:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/old")
         await svc.play("https://youtu.be/abc")
-        succeeded, failed = await svc.set_background_tracks(
-            ["https://youtu.be/x", "https://youtu.be/y"]
-        )
+        succeeded, failed = await svc.set_background_tracks([
+            "https://youtu.be/x",
+            "https://youtu.be/y",
+        ])
         assert succeeded == 2
         assert failed == 0
         assert len(svc.queue.background_tracks) == 2
@@ -374,9 +370,10 @@ class TestPlayerServiceBackgroundSet:
         svc = PlayerService(resolver=resolver, player=player)
         resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad link"))
         await svc.add_background_track("https://youtu.be/old")
-        succeeded, failed = await svc.set_background_tracks(
-            ["https://youtu.be/bad", "https://youtu.be/good"]
-        )
+        succeeded, failed = await svc.set_background_tracks([
+            "https://youtu.be/bad",
+            "https://youtu.be/good",
+        ])
         assert succeeded == 1
         assert failed == 1
         assert len(svc.queue.background_tracks) == 1
@@ -389,9 +386,10 @@ class TestPlayerServiceBackgroundSet:
         await svc.add_background_track("https://youtu.be/original")
         resolver.set_failure("https://youtu.be/bad1", InvalidLinkError("Bad"))
         resolver.set_failure("https://youtu.be/bad2", InvalidLinkError("Bad"))
-        succeeded, failed = await svc.set_background_tracks(
-            ["https://youtu.be/bad1", "https://youtu.be/bad2"]
-        )
+        succeeded, failed = await svc.set_background_tracks([
+            "https://youtu.be/bad1",
+            "https://youtu.be/bad2",
+        ])
         assert succeeded == 0
         assert failed == 2
         assert len(svc.queue.background_tracks) == 1
@@ -409,94 +407,6 @@ class TestPlayerServiceBackgroundIsolation:
         await svc.on_track_end()
         assert len(svc.queue.background_tracks) == 1
         assert svc.queue.background_tracks[0].link == "https://youtu.be/bg"
-
-
-class TestPlayerServiceDucking:
-    @pytest.mark.asyncio
-    async def test_play_ducks_background_when_nothing_playing(
-        self, track1: TrackMetadata
-    ):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/abc")
-        assert player.is_ducking is True
-        assert player.background_volume == player._duck_level
-
-    @pytest.mark.asyncio
-    async def test_play_does_not_duck_again_when_already_playing(
-        self, track1: TrackMetadata
-    ):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/abc")
-        assert player.is_ducking is True
-        player.background_volume = 0.8
-        await svc.play("https://youtu.be/def")
-        assert player.is_ducking is True
-        assert player.background_volume == 0.8
-
-    @pytest.mark.asyncio
-    async def test_on_track_end_unducks_when_queue_empty(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/abc")
-        assert player.is_ducking is True
-        await svc.on_track_end()
-        assert player.is_ducking is False
-
-    @pytest.mark.asyncio
-    async def test_on_track_end_does_not_unduck_when_more_tracks(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/abc")
-        await svc.play("https://youtu.be/def")
-        await svc.on_track_end()
-        assert player.is_ducking is True
-
-    @pytest.mark.asyncio
-    async def test_stop_unducks_background(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/abc")
-        assert player.is_ducking is True
-        await svc.stop()
-        assert player.is_ducking is False
-
-    @pytest.mark.asyncio
-    async def test_stop_on_empty_queue_does_not_crash(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.stop()
-        assert player.is_ducking is False
-
-    @pytest.mark.asyncio
-    async def test_skip_keeps_ducking_when_more_tracks(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/a")
-        await svc.play("https://youtu.be/b")
-        assert player.is_ducking is True
-        await svc.skip()
-        assert player.is_ducking is True
-
-    @pytest.mark.asyncio
-    async def test_skip_to_last_then_on_track_end_unducks(self):
-        resolver = FakeResolver()
-        player = FakePlayer()
-        svc = PlayerService(resolver=resolver, player=player)
-        await svc.play("https://youtu.be/a")
-        await svc.play("https://youtu.be/b")
-        await svc.skip()
-        assert player.is_ducking is True
-        await svc.on_track_end()
-        assert player.is_ducking is False
 
 
 class TestPlayerServiceVolume:
@@ -614,7 +524,8 @@ class TestPlayerServiceBackgroundDelegation:
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/old")
-        await svc.set_background_tracks(
-            ["https://youtu.be/new1", "https://youtu.be/new2"]
-        )
+        await svc.set_background_tracks([
+            "https://youtu.be/new1",
+            "https://youtu.be/new2",
+        ])
         assert len(player.background_tracks) == 2

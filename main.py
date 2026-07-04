@@ -1,3 +1,4 @@
+from harpi.infrastructure.discord_player import DiscordPlayerFactory
 import asyncio
 import logging
 import os
@@ -33,7 +34,8 @@ async def main():
     logger.info("Starting Harpi bot with prefix %r", prefix)
 
     resolver = YoutubeResolver()
-    bot = HarpiBot(resolver=resolver, prefix=prefix)
+    player_factory = DiscordPlayerFactory()
+    bot = HarpiBot(resolver=resolver, prefix=prefix, player_factory=player_factory)
 
     client = discord.Client(intents=intents)
 

@@ -160,14 +160,6 @@ class TestQueueBackgroundTracks:
         assert len(queue.background_tracks) == 1
         assert queue.background_tracks[0] == track1
 
-    def test_clears_background_tracks(
-        self, queue: Queue, track1: TrackMetadata, track2: TrackMetadata
-    ):
-        queue.add_background_track(track1)
-        queue.add_background_track(track2)
-        queue.clear_background_tracks()
-        assert len(queue.background_tracks) == 0
-
     def test_background_starts_empty(self, queue: Queue):
         assert len(queue.background_tracks) == 0
         assert queue.background_tracks == []
@@ -177,19 +169,6 @@ class TestQueueBackgroundTracks:
         bg = queue.background_tracks
         bg.clear()
         assert len(queue.background_tracks) == 1
-
-    def test_next_background_track_empty(self, queue: Queue):
-        assert queue.next_background_track() is None
-
-    def test_next_background_track_loops(
-        self, queue: Queue, track1: TrackMetadata, track2: TrackMetadata
-    ):
-        queue.add_background_track(track1)
-        queue.add_background_track(track2)
-        assert queue.next_background_track() is track1
-        assert queue.next_background_track() is track2
-        assert queue.next_background_track() is track1
-        assert queue.next_background_track() is track2
 
     def test_set_background_tracks_replaces_all(
         self,

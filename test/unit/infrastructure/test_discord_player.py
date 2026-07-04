@@ -1,3 +1,4 @@
+from test.unit.conftest import FakeResolver
 from typing import Any
 import pytest
 from harpi.application.ports.audio import (
@@ -63,7 +64,7 @@ def player(voice_client):
         async def _build_mixed_source(self, track: TrackMetadata) -> Any:
             return FakeAudioSource()
 
-    return TestDiscordPlayer(voice_client=voice_client)
+    return TestDiscordPlayer(voice_client=voice_client, resolver=FakeResolver())
 
 
 @pytest.fixture
@@ -93,9 +94,6 @@ class TestDiscordPlayerInitialState:
     async def test_is_paused_is_false_initially(self, player: AudioPlayerProtocol):
         assert player.is_paused is False
 
-    async def test_is_stopped_is_false_initially(self, player: AudioPlayerProtocol):
-        assert player.is_stopped is False
-
     async def test_background_tracks_is_empty_list(self, player: AudioPlayerProtocol):
         assert player.background_tracks == []
 
@@ -115,13 +113,6 @@ class TestDiscordPlayerPlay:
     ):
         await player.play(track)
         assert voice_client.is_playing()
-
-    async def test_play_clears_is_stopped(
-        self, player: AudioPlayerProtocol, track: TrackMetadata
-    ):
-        await player.stop()
-        await player.play(track)
-        assert player.is_stopped is False
 
     async def test_play_clears_is_paused(
         self, player: AudioPlayerProtocol, track: TrackMetadata
@@ -181,13 +172,6 @@ class TestDiscordPlayerResume:
 
 
 class TestDiscordPlayerStop:
-    async def test_stop_sets_is_stopped(
-        self, player: AudioPlayerProtocol, track: TrackMetadata
-    ):
-        await player.play(track)
-        await player.stop()
-        assert player.is_stopped is True
-
     async def test_stop_clears_playing(
         self, player: AudioPlayerProtocol, track: TrackMetadata
     ):
@@ -211,7 +195,7 @@ class TestDiscordPlayerErrors:
     async def test_play_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
-        player = DiscordPlayer()
+        player = DiscordPlayer(resolver=FakeResolver())
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.play(track)
@@ -225,7 +209,9 @@ class TestDiscordPlayerErrors:
             async def _build_mixed_source(self, track: TrackMetadata) -> Any:
                 raise ValueError("No audio stream available")
 
-        player = FailingDiscordPlayer(voice_client=voice_client)
+        player = FailingDiscordPlayer(
+            voice_client=voice_client, resolver=FakeResolver()
+        )
 
         with pytest.raises(ValueError, match="No audio stream available"):
             await player.play(track)
@@ -233,7 +219,7 @@ class TestDiscordPlayerErrors:
     async def test_pause_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
-        player = DiscordPlayer()
+        player = DiscordPlayer(resolver=FakeResolver())
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.pause()
@@ -241,7 +227,7 @@ class TestDiscordPlayerErrors:
     async def test_resume_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
-        player = DiscordPlayer()
+        player = DiscordPlayer(resolver=FakeResolver())
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.resume()
@@ -249,7 +235,7 @@ class TestDiscordPlayerErrors:
     async def test_stop_without_voice_client_raises(self, track: TrackMetadata):
         from harpi.infrastructure.discord_player import DiscordPlayer
 
-        player = DiscordPlayer()
+        player = DiscordPlayer(resolver=FakeResolver())
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await player.stop()
@@ -332,7 +318,7 @@ def make_streamed_player(voice_client):
             ) -> Any:
                 return procs.pop(0)
 
-        return StreamedDiscordPlayer(voice_client=voice_client)
+        return StreamedDiscordPlayer(voice_client=voice_client, resolver=FakeResolver())
 
     return _make
 
@@ -351,31 +337,16 @@ class TestDiscordPlayerLiveVolume:
     async def test_set_background_volume_mid_playback_changes_output(
         self, make_streamed_player, voice_client, track, bg_track
     ):
-        player = make_streamed_player(
-            [FakeStreamProcess(3, value=0), FakeStreamProcess(3, value=1000)]
-        )
+        player = make_streamed_player([
+            FakeStreamProcess(3, value=0),
+            FakeStreamProcess(3, value=1000),
+        ])
         await player.play(track)
         await player.add_background_source(bg_track)
 
         player.set_background_volume(0.2)
 
         assert _first_sample(voice_client._source.read()) == 200
-
-    async def test_duck_mid_playback_lowers_background_now(
-        self, make_streamed_player, voice_client, track, bg_track
-    ):
-        player = make_streamed_player(
-            [FakeStreamProcess(4, value=0), FakeStreamProcess(4, value=1000)]
-        )
-        await player.play(track)
-        await player.add_background_source(bg_track)
-        player.set_ducking(0.1)
-
-        await player.duck()
-        assert _first_sample(voice_client._source.read()) == 100
-
-        await player.unduck()
-        assert _first_sample(voice_client._source.read()) == 100 * 5
 
 
 class TestDiscordPlayerBackgroundRemovalMapping:
@@ -401,9 +372,10 @@ class TestDiscordPlayerTrackEnd:
     ):
         import asyncio
 
-        player = make_streamed_player(
-            [FakeStreamProcess(1, value=1000), FakeStreamProcess(5, value=100)]
-        )
+        player = make_streamed_player([
+            FakeStreamProcess(1, value=1000),
+            FakeStreamProcess(5, value=100),
+        ])
         finished = asyncio.Event()
 
         async def on_finish():
@@ -429,13 +401,11 @@ class TestDiscordPlayerTrackEnd:
             duration=90,
             source=Source.YOUTUBE,
         )
-        player = make_streamed_player(
-            [
-                FakeStreamProcess(1, value=1000),
-                FakeStreamProcess(9, value=0),
-                FakeStreamProcess(3, value=800),
-            ]
-        )
+        player = make_streamed_player([
+            FakeStreamProcess(1, value=1000),
+            FakeStreamProcess(9, value=0),
+            FakeStreamProcess(3, value=800),
+        ])
         finished = asyncio.Event()
 
         async def on_finish():
@@ -506,7 +476,7 @@ class TestDiscordPlayerBackgroundLooping:
                 spawned.append((track.link, loop))
                 return FakeStreamProcess(3, value=0)
 
-        player = RecordingPlayer(voice_client=voice_client)
+        player = RecordingPlayer(voice_client=voice_client, resolver=FakeResolver())
         await player.play(track)
         await player.add_background_source(bg_track)
 
@@ -526,7 +496,7 @@ class TestDiscordPlayerBackgroundLooping:
                 spawned.append((track.link, loop))
                 return FakeStreamProcess(3, value=0)
 
-        player = RecordingPlayer(voice_client=voice_client)
+        player = RecordingPlayer(voice_client=voice_client, resolver=FakeResolver())
         await player.add_background_source(bg_track)
         await player.play(track)
 
@@ -539,10 +509,10 @@ class TestDiscordPlayerBackgroundLooping:
 
         class RecordingPopenPlayer(DiscordPlayer):
             @staticmethod
-            def _popen(args):
+            def _popen(args: list[str], **kwargs) -> Any:
                 recorded.append(args)
 
-        player = RecordingPopenPlayer()
+        player = RecordingPopenPlayer(resolver=FakeResolver())
         player._spawn_pcm_process("http://x", loop=True)
         player._spawn_pcm_process("http://x", loop=False)
 
@@ -601,11 +571,3 @@ class TestDiscordPlayerUsesResolver:
         await player.add_background_source(bg_track)
 
         assert f"http://stream/{bg_track.link}" in captured
-
-    async def test_play_without_resolver_raises(self, voice_client, track):
-        from harpi.infrastructure.discord_player import DiscordPlayer
-
-        player = DiscordPlayer(voice_client=voice_client)
-
-        with pytest.raises(RuntimeError, match="resolver"):
-            await player.play(track)

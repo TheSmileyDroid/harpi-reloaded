@@ -29,16 +29,6 @@ class Queue:
     def set_background_tracks(self, tracks: list[TrackMetadata]) -> None:
         self._background = list(tracks)
 
-    def clear_background_tracks(self) -> None:
-        self._background.clear()
-
-    def next_background_track(self) -> TrackMetadata | None:
-        if not self._background:
-            return None
-        track = self._background.pop(0)
-        self._background.append(track)
-        return track
-
     def get_current_track(self) -> TrackMetadata | None:
         return self._queue[0] if self._queue else None
 

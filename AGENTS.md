@@ -168,7 +168,7 @@ src/harpi/
 
 ### FakePlayer State
 - `FakePlayer.playing` — the currently playing track (or None)
-- `FakePlayer.is_paused` / `FakePlayer.is_stopped` — boolean flags
+- `FakePlayer.is_paused` boolean flag
 - `FakePlayer.background_tracks` — list of background tracks
 - All player methods are async (`play`, `pause`, `resume`, `stop`)
 

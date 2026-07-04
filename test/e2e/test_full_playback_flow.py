@@ -1,3 +1,4 @@
+from harpi.infrastructure.discord_player import DiscordPlayerFactory
 import asyncio
 import os
 import pytest
@@ -111,7 +112,8 @@ async def test_voice_channel(discord_client):
 async def running_bot(discord_client):
     client, guild_id, channel_id = discord_client
     resolver = YoutubeResolver()
-    bot = HarpiBot(resolver=resolver)
+    player_factory = DiscordPlayerFactory()
+    bot = HarpiBot(resolver=resolver, prefix="-", player_factory=player_factory)
 
     guild = client.get_guild(guild_id)
     channel = guild.get_channel(channel_id)

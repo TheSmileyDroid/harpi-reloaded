@@ -1,7 +1,11 @@
 import logging
 
 from harpi.application.player_service import PlayerService
-from harpi.application.ports.audio import AudioResolverProtocol
+from harpi.application.ports.audio import (
+    AudioResolverProtocol,
+    AudioPlayerProtocol,
+    AudioPlayerFactoryProtocol,
+)
 from harpi.application.commands import EmbedData
 from harpi.infrastructure.command_router import CommandRouter
 from harpi.infrastructure.discord_player import DiscordPlayer
@@ -12,40 +16,31 @@ logger = logging.getLogger(__name__)
 class HarpiBot:
     def __init__(
         self,
-        player_service: PlayerService | None = None,
-        resolver: AudioResolverProtocol | None = None,
+        resolver: AudioResolverProtocol,
+        player_factory: AudioPlayerFactoryProtocol,
         prefix: str = "-",
     ):
         self._prefix = prefix
         self._resolver = resolver
-        self._guild_players: dict[int, DiscordPlayer] = {}
+        self._player_factory = player_factory
+        self._guild_players: dict[int, AudioPlayerProtocol] = {}
         self._guild_routers: dict[int, CommandRouter] = {}
-        self._router: CommandRouter | None = None
-
-        if player_service is not None:
-            self._router = CommandRouter(player_service=player_service, prefix=prefix)
-        else:
-            self._router = None
 
     def _ensure_guild_state(self, guild_id: int) -> CommandRouter | None:
         if guild_id in self._guild_routers:
             return self._guild_routers[guild_id]
         if self._resolver is None:
             return None
-        player = DiscordPlayer(resolver=self._resolver)
+        if self._player_factory is not None:
+            player = self._player_factory.create_player(resolver=self._resolver)
+        else:
+            player = DiscordPlayer(resolver=self._resolver)
         service = PlayerService(resolver=self._resolver, player=player)
         router = CommandRouter(player_service=service, prefix=self._prefix)
         self._guild_players[guild_id] = player
         self._guild_routers[guild_id] = router
         logger.debug("Created guild state for guild %d", guild_id)
         return router
-
-    async def on_message(
-        self, content: str, author_is_bot: bool
-    ) -> str | EmbedData | None:
-        if author_is_bot or self._router is None:
-            return None
-        return await self._router.dispatch(content)
 
     async def _ensure_voice_connection(self, message) -> str | None:
         guild_id = message.guild.id if message.guild else 0

@@ -46,7 +46,13 @@ also_copy = ["README.md", "src/harpi/infrastructure"]
 
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb", "test", "src"]
-search-path = ["src", "test"]
+search-path = ["src", "test", "."]
+
+[tool.ty.src]
+exclude = ["whitelist.py"]
+
+[tool.ruff]
+exclude = ["whitelist.py"]
 
 [build-system]
 requires = ["hatchling"]
@@ -59,6 +65,8 @@ packages = ["src/harpi"]
 extraPaths = ["."]
 
 [tool.vulture]
-paths = ["src/harpi"]
-min_confidence = 80
-ignore_names = ["position_seconds"]
+paths = ["src/harpi", "main.py"]
+min_confidence = 50
+exclude = [".venv/", "tests/", "docs/", "*settings.py", "mutants/"]
+ignore_names = ["message_content"]
+ignore_decorators = ["@register", "@client.event"]

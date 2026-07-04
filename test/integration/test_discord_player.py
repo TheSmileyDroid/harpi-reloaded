@@ -86,13 +86,11 @@ class TestDiscordPlayerRealVoice:
         assert player.playing is not None
         assert player.playing.title == "Me at the zoo"
         assert not player.is_paused
-        assert not player.is_stopped
 
         await asyncio.sleep(2)
         assert voice_client.is_playing()
 
         await player.stop()
-        assert player.is_stopped
         assert player.playing is None
 
     @pytest.mark.asyncio

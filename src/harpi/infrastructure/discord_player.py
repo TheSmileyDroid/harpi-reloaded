@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 class DiscordPlayer(AudioPlayerProtocol):
     def __init__(
         self,
+        resolver: AudioResolverProtocol,
         voice_client: Any = None,
-        resolver: AudioResolverProtocol | None = None,
     ):
         self._voice_client = voice_client
         self._resolver = resolver
@@ -31,10 +31,8 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._saved_background_volume: float | None = None
         self.background_tracks: list[TrackMetadata] = []
         self.is_paused: bool = False
-        self.is_stopped: bool = False
         self.volume: float = 1.0
         self.background_volume: float = 0.5
-        self.is_ducking: bool = False
         self._mixed_source: MixedAudioSource | None = None
         self._fg_proc: Any = None
 
@@ -71,7 +69,6 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._paused_position = None
         self._on_finish_callback = on_finish
         self._loop = asyncio.get_event_loop()
-        self.is_stopped = False
         self.is_paused = False
         logger.info("Playing %s (%s)", track.title, track.link)
         try:
@@ -127,7 +124,6 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._current = None
         self._start_time = None
         self._paused_position = None
-        self.is_stopped = True
         self.is_paused = False
 
     _FFMPEG_PCM_ARGS = [
@@ -269,34 +265,16 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._duck_level = duck_level
         logger.info("Duck level set to %s", duck_level)
 
-    async def duck(self) -> None:
-        if self.is_ducking:
-            return
-        self._saved_background_volume = self.background_volume
-        self.background_volume = self._duck_level
-        self.is_ducking = True
-        self._apply_background_volume()
-        logger.info("Ducking: background volume -> %s", self._duck_level)
-
-    async def unduck(self) -> None:
-        if not self.is_ducking:
-            return
-        if self._saved_background_volume is not None:
-            self.background_volume = self._saved_background_volume
-            self._saved_background_volume = None
-        self.is_ducking = False
-        self._apply_background_volume()
-        logger.info(
-            "Unducking: background volume restored to %s", self.background_volume
-        )
-
-    def set_voice_client(self, vc: Any) -> None:
-        self._voice_client = vc
-        self.is_stopped = False
+    def set_voice_client(self, voice_client: Any) -> None:
+        self._voice_client = voice_client
         self.is_paused = False
 
     async def connect(self, channel) -> None:
         self._voice_client = await channel.connect()
         logger.info("Connected to voice channel %s", channel.name)
-        self.is_stopped = True
         self.is_paused = False
+
+
+class DiscordPlayerFactory:
+    def create_player(self, resolver: AudioResolverProtocol) -> AudioPlayerProtocol:
+        return DiscordPlayer(resolver=resolver)
