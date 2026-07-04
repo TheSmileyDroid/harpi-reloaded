@@ -173,7 +173,9 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     @staticmethod
     async def _resolve_url(track: TrackMetadata) -> str:
-        yt = AsyncYouTube(track.link, "WEB")
+        # WEB retorna URLs SABR que o FFmpeg não consegue abrir; ANDROID_VR
+        # serve stream direto sem exigir PO Token.
+        yt = AsyncYouTube(track.link, "ANDROID_VR")
         streams = await yt.streams()
         stream = streams.get_audio_only()
         if stream is None:

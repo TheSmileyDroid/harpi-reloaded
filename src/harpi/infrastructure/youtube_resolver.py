@@ -41,7 +41,7 @@ class YoutubeResolver(AudioResolverProtocol):
 
     async def _fetch_metadata(self, link: str) -> tuple[str | None, int | None, str]:
         try:
-            yt = AsyncYouTube(link, "WEB")
+            yt = AsyncYouTube(link, "ANDROID_VR")
         except RegexMatchError as e:
             raise InvalidLinkError(str(e)) from e
 
