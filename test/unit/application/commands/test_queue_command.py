@@ -249,16 +249,51 @@ class TestBackgroundCommands:
         assert isinstance(result, str)
         assert "vazio" in result
 
-    async def test_bgrm_handler_by_index(self, service: PlayerService):
+    async def test_bgrm_handler_by_index_matches_displayed_numbering(
+        self, service: PlayerService
+    ):
         from harpi.application.commands.background_remove import handle_bgrm
 
         await service.add_background_track("https://youtu.be/abc")
         await service.add_background_track("https://youtu.be/def")
 
-        result = await handle_bgrm(service, "0")
+        result = await handle_bgrm(service, "1")
         assert isinstance(result, str)
         assert len(service.queue.background_tracks) == 1
         assert service.queue.background_tracks[0].link == "https://youtu.be/def"
+
+    async def test_bgrm_handler_removes_last_index(self, service: PlayerService):
+        from harpi.application.commands.background_remove import handle_bgrm
+
+        await service.add_background_track("https://youtu.be/abc")
+        await service.add_background_track("https://youtu.be/def")
+
+        result = await handle_bgrm(service, "2")
+        assert isinstance(result, str)
+        assert len(service.queue.background_tracks) == 1
+        assert service.queue.background_tracks[0].link == "https://youtu.be/abc"
+
+    async def test_bgrm_handler_zero_is_invalid(self, service: PlayerService):
+        from harpi.application.commands.background_remove import handle_bgrm
+
+        await service.add_background_track("https://youtu.be/abc")
+
+        result = await handle_bgrm(service, "0")
+        assert isinstance(result, str)
+        assert "inválido" in result
+        assert len(service.queue.background_tracks) == 1
+
+    async def test_bgrm_handler_just_above_maximum_is_invalid(
+        self, service: PlayerService
+    ):
+        from harpi.application.commands.background_remove import handle_bgrm
+
+        await service.add_background_track("https://youtu.be/abc")
+
+        result = await handle_bgrm(service, "2")
+        assert isinstance(result, str)
+        assert "inválido" in result
+        assert len(service.queue.background_tracks) == 1
 
     async def test_bgrm_handler_invalid_index_returns_error(
         self, service: PlayerService
@@ -300,7 +335,7 @@ class TestQueueBackgroundEmbed:
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
         assert "\n\n**Músicas de fundo:**" in result.description
-        assert "0. Fake Track" in result.description
+        assert "1. Fake Track" in result.description
         assert "Fundo: 1" in result.footer
 
     async def test_queue_bg_track_without_title_shows_fallback(
@@ -319,7 +354,7 @@ class TestQueueBackgroundEmbed:
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
         lines = result.description.split("\n")
-        assert any(line == "0. Desconhecida (02:00)" for line in lines)
+        assert any(line == "1. Desconhecida (02:00)" for line in lines)
 
     async def test_queue_shows_background_tracks_when_nothing_playing(
         self, service: PlayerService
@@ -332,7 +367,7 @@ class TestQueueBackgroundEmbed:
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
         assert (
-            "Nada tocando no momento.\n\n**Músicas de fundo:**\n0. Fake Track"
+            "Nada tocando no momento.\n\n**Músicas de fundo:**\n1. Fake Track"
             in result.description
         )
 
@@ -350,4 +385,4 @@ class TestQueueBackgroundEmbed:
 
         result = await handle_queue(service, "")
         assert isinstance(result, EmbedData)
-        assert "0. Desconhecida (02:00)" in result.description
+        assert "1. Desconhecida (02:00)" in result.description

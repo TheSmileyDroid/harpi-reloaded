@@ -30,7 +30,7 @@ def _build_queue_embed(service: PlayerService) -> str | EmbedData:
         description = "Nada tocando no momento."
         if bg_tracks:
             bg_lines = ["", "**Músicas de fundo:**"]
-            for i, t in enumerate(bg_tracks):
+            for i, t in enumerate(bg_tracks, start=1):
                 td = _format_duration(t.duration)
                 title = t.title or "Desconhecida"
                 bg_lines.append(f"{i}. {title} ({td})")
@@ -52,7 +52,7 @@ def _build_queue_embed(service: PlayerService) -> str | EmbedData:
     if bg_tracks:
         lines.append("")
         lines.append("**Músicas de fundo:**")
-        for i, t in enumerate(bg_tracks):
+        for i, t in enumerate(bg_tracks, start=1):
             td = _format_duration(t.duration)
             title = t.title or "Desconhecida"
             lines.append(f"{i}. {title} ({td})")

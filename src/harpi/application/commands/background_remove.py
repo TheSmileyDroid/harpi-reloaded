@@ -11,8 +11,11 @@ async def handle_bgrm(service: PlayerService, args: str) -> str:
         index = int(index_str)
     except ValueError:
         return "O índice deve ser um número."
+    if index < 1:
+        return f"Índice {index} inválido."
     try:
-        service.remove_background_track(index)
+        # A lista do -queue numera os fundos a partir de 1.
+        service.remove_background_track(index - 1)
         return f"Música de fundo {index} removida."
     except IndexError:
         return f"Índice {index} inválido."
