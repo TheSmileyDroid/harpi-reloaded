@@ -24,8 +24,8 @@ _registry: dict[str, CommandHandler] = {}
 
 def register(
     name: str,
-    guild_only: bool = False,
-    voice: bool = False,  # pragma: no mutate
+    guild_only: bool = False,  # pragma: no mutate (trampoline artifact)
+    voice: bool = False,  # pragma: no mutate (trampoline artifact)
 ) -> Callable[[Handler], Handler]:
     def decorator(func: Handler) -> Handler:
         _registry[name] = CommandHandler(func=func, guild_only=guild_only, voice=voice)

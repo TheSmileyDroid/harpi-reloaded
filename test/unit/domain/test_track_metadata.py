@@ -167,3 +167,7 @@ class TestValidateVolumeBVA:
     def test_custom_name_in_error(self):
         with pytest.raises(ValueError, match="Duck level"):
             validate_volume(-0.1, "Duck level")
+
+    def test_default_name_in_error(self):
+        with pytest.raises(ValueError, match="^Volume must be between"):
+            validate_volume(-0.1)

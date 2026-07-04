@@ -168,6 +168,17 @@ class TestRegistry:
         assert handlers["__test_only__"].guild_only is True
         assert handlers["__test_only__"].voice is False
 
+    async def test_register_defaults_to_not_guild_only_and_no_voice(self):
+        from harpi.application.commands import register, get_handlers
+
+        @register("__defaults_test__")
+        async def _defaults_handler(service, args: str) -> str:
+            return "ok"
+
+        handlers = get_handlers()
+        assert handlers["__defaults_test__"].guild_only is False
+        assert handlers["__defaults_test__"].voice is False
+
     async def test_register_with_voice_true(self):
         from harpi.application.commands import register, get_handlers
 

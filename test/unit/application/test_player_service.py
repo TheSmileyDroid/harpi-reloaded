@@ -355,6 +355,19 @@ class TestPlayerServiceBackgroundSet:
         assert svc.queue.get_current_track() == track1
 
     @pytest.mark.asyncio
+    async def test_set_background_tracks_forwards_resolved_tracks_to_player(self):
+        resolver = FakeResolver()
+        player = FakePlayer()
+        svc = PlayerService(resolver=resolver, player=player)
+        await svc.add_background_track("https://youtu.be/old1")
+        await svc.add_background_track("https://youtu.be/old2")
+        await svc.set_background_tracks(["https://youtu.be/x", "https://youtu.be/y"])
+        assert [t.title for t in player.background_tracks] == [
+            "Fake Track",
+            "Fake Track",
+        ]
+
+    @pytest.mark.asyncio
     async def test_set_background_tracks_partial_failure(self):
         resolver = FakeResolver()
         player = FakePlayer()

@@ -67,8 +67,9 @@ class TestBackground:
 
     def test_remove_entry_not_found_raises(self):
         bg = Background()
-        with pytest.raises(KeyError):
-            bg.remove_entry(BackgroundTrackId())
+        missing_id = BackgroundTrackId()
+        with pytest.raises(KeyError, match="not found"):
+            bg.remove_entry(missing_id)
 
     def test_get_entry_by_id(self):
         bg = Background()
