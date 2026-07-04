@@ -1,18 +1,76 @@
 # Harpi Reloaded
 
-This project is a remake of an old project with the objective of making it faster, safer, and fully tested. The old project was a Discord bot that could play music and use TTS (Text-to-Speech) to speak in a voice channel. It featured a mixer capable of merging multiple audio streams into a single stream to send through the Discord API. Because of this, it could play background music even while someone was using the TTS feature. It also included a graphical interface, built with Svelte, to manage music requests (such as play, loop, and skip) and to monitor the queue's progress.
+Bot de Discord para mesas de TTRPG: toca música do YouTube, mescla **sons de fundo**
+com **ducking automático** (o fundo abaixa quando a música principal toca) e gerencia
+fila com modos de loop — tudo construído com Arquitetura Limpa e TDD.
 
-The base idea was to create a Discord bot that could be useful while playing TTRPGs (Tabletop Roleplaying Games) in a Discord voice channel.
+Remake do [Harpi](https://github.com/TheSmileyDroid/harpi) original, reescrito do zero
+com foco em estabilidade e teste automatizado.
 
-## New Version
+## Quickstart
 
-As this is a new iteration of the old [Harpi](https://github.com/TheSmileyDroid/harpi) project, this version includes every feature from the original, built entirely from scratch. New features are on the way too, and hopefully, it will be much more stable than the old version.
+Requisitos: Python 3.12+, [uv](https://docs.astral.sh/uv/), FFmpeg no PATH.
 
-A partial list of planned features:
+```bash
+uv sync                      # instala dependências
+cp .env.example .env         # configure DISCORD_TOKEN (e opcional BOT_PREFIX)
+uv run python main.py        # inicia o bot
+```
 
-- Complete Music API
-- YouTube + Spotify support
-- Live YouTube Stream support
-- Graphical interface
-- Authentication via Discord
-- Virtual tabletop RPG features
+No Discord (prefixo padrão `-`):
+
+| Comando | Efeito |
+|---|---|
+| `-play <link>` | Toca / enfileira uma música do YouTube |
+| `-queue` | Mostra a fila e o modo de loop |
+| `-loop [off\|track\|queue]` | Alterna o modo de loop |
+| `-skip` / `-pause` / `-resume` / `-stop` | Controle de reprodução |
+| `-rm <índice>` | Remove música da fila |
+| `-bg <links>` / `-bgadd <link>` / `-bgrm <índice>` | Sons de fundo mixados |
+| `-volume <0..1>` / `-bgvolume <0..1>` / `-duck <0..1>` | Volumes e ducking |
+
+## Testes
+
+Pirâmide com três níveis (ver [AGENTS.md](AGENTS.md) para as regras completas):
+
+```bash
+uv run pytest test/unit -v          # 280 testes — domain + application com fakes (~1s)
+uv run pytest test/integration -v   # 13 testes — IO real (YouTube, FFmpeg, voz do Discord)
+uv run pytest test/e2e -v           # 1 teste  — jornada completa de usuário
+uv run pytest test/                 # tudo + relatório de cobertura (88%)
+```
+
+Os testes de integração/e2e exigem `DISCORD_TOKEN`, `TEST_GUILD_ID` e
+`TEST_VOICE_CHANNEL_ID` no ambiente — sem eles, são pulados automaticamente.
+
+Qualidade da suíte verificada com **teste de mutação**:
+
+```bash
+uv run mutmut run    # 201/201 mutantes mortos (100% kill rate)
+```
+
+Suíte completa de verificação (type check + lint + dead code + testes):
+
+```bash
+uv run ty check src/harpi/ test/ main.py && uv run ruff check src/ test/ && uv run vulture && uv run pytest test/ -v
+```
+
+## Arquitetura
+
+Arquitetura Limpa em três camadas (+ composition root) — detalhes em
+[docs/architecture.md](docs/architecture.md):
+
+```
+domain/          entidades puras (Queue, Background, LoopMode, volume) — zero deps
+application/     casos de uso (PlayerService, comandos) + Portas (Protocol)
+infrastructure/  adaptadores (YoutubeResolver, DiscordPlayer, mixagem numpy/FFmpeg)
+```
+
+Material da apresentação do projeto: [docs/apresentacao.md](docs/apresentacao.md).
+
+## Funcionalidades planejadas
+
+- Suporte a Spotify e streams ao vivo do YouTube
+- TTS (text-to-speech) mixado com a música
+- Interface web para gerenciar a fila
+- Ferramentas de mesa (dados, iniciativa) para TTRPG
