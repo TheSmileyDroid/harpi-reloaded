@@ -1,3 +1,5 @@
+[![CI](https://github.com/TheSmileyDroid/harpi-reloaded/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSmileyDroid/harpi-reloaded/actions/workflows/ci.yml)
+
 # Harpi Reloaded
 
 Bot de Discord para mesas de TTRPG. Toca música do YouTube, mescla sons de fundo com
