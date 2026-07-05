@@ -35,6 +35,7 @@ addopts = [
     "--import-mode=importlib",
     "--cov=harpi",
     "--cov-report=term-missing",
+    "--cov-report=xml",
     "--ignore=mutants/",
     "--ignore=test/e2e",
 ]

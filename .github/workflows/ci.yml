@@ -35,6 +35,14 @@ jobs:
       - name: Unit tests
         run: uv run pytest test/unit/ -v
 
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: false
+
   integration-e2e:
     name: Integration + E2E Tests
     runs-on: ubuntu-latest
