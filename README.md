@@ -1,6 +1,9 @@
-# Harpi Reloaded
+[![CI](https://github.com/TheSmileyDroid/harpi-reloaded/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSmileyDroid/harpi-reloaded/actions/workflows/ci.yml)
 
 [![codecov](https://codecov.io/github/TheSmileyDroid/harpi-reloaded/graph/badge.svg?token=MYJ7OHWY5B)](https://codecov.io/github/TheSmileyDroid/harpi-reloaded)
+
+
+# Harpi Reloaded
 
 Bot de Discord para mesas de TTRPG. Toca música do YouTube, mescla sons de fundo com
 ducking automático (o fundo abaixa quando a música principal toca) e gerencia a fila
