@@ -127,3 +127,21 @@ class TestSourceIdExtraction:
     def test_source_id(self, link: str, source: Source, expected: str):
         metadata = TrackMetadata(link=link, source=source)
         assert metadata.source_id == expected
+
+
+class TestTrackMetadataHash:
+    def test_hash_is_consistent(self):
+        meta1 = TrackMetadata(
+            link="https://youtu.be/abc", source=Source.YOUTUBE, title="A", duration=60
+        )
+        meta2 = TrackMetadata(
+            link="https://youtu.be/abc", source=Source.YOUTUBE, title="A", duration=60
+        )
+        assert hash(meta1) == hash(meta2)
+
+    def test_hash_usable_in_set(self):
+        meta = TrackMetadata(
+            link="https://youtu.be/abc", source=Source.YOUTUBE, title="A", duration=60
+        )
+        s = {meta}
+        assert meta in s

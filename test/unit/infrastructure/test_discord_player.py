@@ -624,3 +624,76 @@ class TestDiscordPlayerUsesResolver:
         await player.add_background_source(bg_track)
 
         assert f"http://stream/{bg_track.link}" in captured
+
+
+class TestDiscordPlayerPosition:
+    async def test_position_when_paused(self, player, track):
+        await player.play(track)
+        await player.pause()
+        pos = player.position
+        assert pos is not None
+        assert isinstance(pos, float)
+
+    async def test_position_when_start_time_none(self):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        player = DiscordPlayer(voice_client=FakeVoiceClient(), resolver=FakeResolver())
+        player._current = TrackMetadata(
+            link="https://youtu.be/abc",
+            title="Test",
+            duration=120,
+            source=Source.YOUTUBE,
+        )
+        player._start_time = None
+        assert player.position is None
+
+
+class TestDiscordPlayerStopCleanup:
+    async def test_stop_with_mixed_source_cleans_up(
+        self, make_streamed_player, voice_client, track
+    ):
+        player = make_streamed_player([FakeStreamProcess(3, value=0)])
+        await player.play(track)
+        assert player._mixed_source is not None
+
+        await player.stop()
+
+        assert player._mixed_source is None
+        assert player._fg_proc is None
+
+
+class TestDiscordPlayerOnFinish:
+    async def test_on_finish_no_error(self, make_streamed_player, voice_client, track):
+        import asyncio
+
+        player = make_streamed_player([FakeStreamProcess(1, value=1000)])
+        finished = asyncio.Event()
+
+        async def on_finish():
+            finished.set()
+
+        await player.play(track, on_finish=on_finish)
+
+        after = voice_client._after
+        assert after is not None
+        after(None)
+        await asyncio.wait_for(finished.wait(), timeout=1)
+
+
+class TestDiscordPlayerSetDucking:
+    async def test_set_ducking_validates_and_sets(self, player):
+        player.set_ducking(0.3)
+
+    async def test_set_ducking_invalid_raises(self, player):
+        with pytest.raises(ValueError):
+            player.set_ducking(1.5)
+
+
+class TestDiscordPlayerFactory:
+    def test_create_player(self):
+        from harpi.infrastructure.discord_player import DiscordPlayerFactory
+
+        factory = DiscordPlayerFactory()
+        player = factory.create_player(resolver=FakeResolver())
+        assert isinstance(player, type(player))
+        assert player.playing is None

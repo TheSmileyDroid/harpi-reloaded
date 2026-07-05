@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 
 from pytubefix.async_youtube import AsyncYouTube
 from pytubefix.exceptions import (
@@ -19,6 +20,9 @@ from harpi.application.exceptions import (
 
 class YoutubeResolver(AudioResolverProtocol):
     TIMEOUT = 15
+
+    def __init__(self, youtube_factory: Callable | None = None):
+        self._youtube_factory = youtube_factory or AsyncYouTube
 
     async def resolve(self, link: str) -> TrackMetadata:
         if not link or not link.strip():
@@ -43,7 +47,7 @@ class YoutubeResolver(AudioResolverProtocol):
         try:
             # WEB retorna URLs SABR que o FFmpeg não consegue abrir; ANDROID_VR
             # serve stream direto sem exigir PO Token.
-            yt = AsyncYouTube(track.link, "ANDROID_VR")
+            yt = self._youtube_factory(track.link, "ANDROID_VR")
         except RegexMatchError as e:
             raise InvalidLinkError(str(e)) from e
 
@@ -65,7 +69,7 @@ class YoutubeResolver(AudioResolverProtocol):
 
     async def _fetch_metadata(self, link: str) -> tuple[str | None, int | None, str]:
         try:
-            yt = AsyncYouTube(link, "ANDROID_VR")
+            yt = self._youtube_factory(link, "ANDROID_VR")
         except RegexMatchError as e:
             raise InvalidLinkError(str(e)) from e
 

@@ -1,4 +1,5 @@
 import io
+
 import numpy as np
 import pytest
 from harpi.infrastructure.mixed_audio_source import MixedAudioSource, PCM_FRAME_SIZE
@@ -293,3 +294,38 @@ class TestMixedAudioSourceSourceLifecycle:
 
         with pytest.raises(ValueError):
             mixer.replace_source(0, FakeProcess(_frame()), 1.5)
+
+
+class TestMixedAudioSourceEdgeCases:
+    def test_read_when_stdout_is_none(self):
+        class _NoStdoutProcess:
+            stdout = None
+
+            def kill(self):
+                pass
+
+            def wait(self, timeout: float = 1):
+                pass
+
+        mixer = MixedAudioSource(processes=[_NoStdoutProcess()], volumes=[1.0])
+
+        result = mixer.read()
+
+        assert result == b""
+
+    def test_cleanup_exception_handling(self):
+        class FailingProcess:
+            stdout = None
+
+            def kill(self):
+                raise OSError("kill failed")
+
+            def wait(self, timeout=1):
+                raise OSError("wait failed")
+
+        proc = FailingProcess()
+        mixer = MixedAudioSource(processes=[proc], volumes=[1.0])
+
+        mixer.cleanup()
+
+        assert mixer.source_count == 0

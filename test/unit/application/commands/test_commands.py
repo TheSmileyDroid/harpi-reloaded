@@ -74,6 +74,20 @@ class TestBgVolumeCommand:
         assert isinstance(result, str)
         assert "Especifique" in result
 
+    async def test_bgvolume_non_numeric_returns_error(self, service: PlayerService):
+        from harpi.application.commands.volume import handle_bgvolume
+
+        result = await handle_bgvolume(service, "abc")
+        assert isinstance(result, str)
+        assert "deve ser um número" in result
+
+    async def test_bgvolume_out_of_range_returns_error(self, service: PlayerService):
+        from harpi.application.commands.volume import handle_bgvolume
+
+        result = await handle_bgvolume(service, "1.5")
+        assert isinstance(result, str)
+        assert "deve ser um número" in result or "must be between" in result
+
 
 @pytest.mark.asyncio
 class TestDuckCommand:
@@ -94,6 +108,20 @@ class TestDuckCommand:
         result = await handle_duck(service, "")
         assert isinstance(result, str)
         assert "Especifique" in result
+
+    async def test_duck_non_numeric_returns_error(self, service: PlayerService):
+        from harpi.application.commands.volume import handle_duck
+
+        result = await handle_duck(service, "abc")
+        assert isinstance(result, str)
+        assert "deve ser um número" in result
+
+    async def test_duck_out_of_range_returns_error(self, service: PlayerService):
+        from harpi.application.commands.volume import handle_duck
+
+        result = await handle_duck(service, "1.5")
+        assert isinstance(result, str)
+        assert "deve ser um número" in result or "must be between" in result
 
 
 @pytest.mark.asyncio

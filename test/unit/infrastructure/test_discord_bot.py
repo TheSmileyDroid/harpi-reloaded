@@ -1,6 +1,7 @@
 import pytest
 from harpi.application.commands import Response
 from harpi.infrastructure.discord_bot import HarpiBot
+from harpi.infrastructure.command_router import CommandRouter
 
 
 def _as_str(response: Response) -> str:
@@ -41,6 +42,22 @@ class _FakeAuthor:
     def __init__(self, voice: _FakeVoiceState | None = None, bot: bool = False):
         self.bot = bot
         self.voice = voice
+
+
+class _FailingRouter(CommandRouter):
+    async def dispatch(self, message: str) -> Response:
+        raise RuntimeError("Something broke")
+
+
+class _FakeVoiceClientWithChannel:
+    def __init__(self, channel: _FakeVoiceChannel):
+        self.channel = channel
+
+    def is_playing(self) -> bool:
+        return False
+
+    async def move_to(self, channel: _FakeVoiceChannel) -> None:
+        self.channel = channel
 
 
 @pytest.fixture
@@ -254,3 +271,104 @@ class TestHarpiBotCustomTokenAndPrefix:
         )
         assert response is not None
         assert "Adicionado" in _as_str(response)
+
+
+class TestHarpiBotEdgeCases:
+    @pytest.mark.asyncio
+    async def test_message_no_guild(self):
+        from test.unit.conftest import FakeResolver, FakePlayerFactory
+
+        bot = HarpiBot(
+            resolver=FakeResolver(), player_factory=FakePlayerFactory(), prefix="-"
+        )
+        msg = _FakeDiscordMessage(content="-play https://youtu.be/abc", guild=None)
+
+        response = await bot.handle_discord_message(msg)
+
+        assert response is not None
+
+    @pytest.mark.asyncio
+    async def test_prefix_only_returns_help(self, bot: HarpiBot):
+        response = await bot.handle_discord_message(
+            _FakeDiscordMessage(
+                content="-",
+                guild=_FakeGuild(),
+                voice=_FakeVoiceState(_FakeVoiceChannel()),
+            )
+        )
+        assert response is not None
+        msg = _as_str(response).lower()
+        assert "help" in msg or "comandos" in msg
+
+    @pytest.mark.asyncio
+    async def test_voice_connection_no_existing_client(self):
+        from test.unit.conftest import FakeResolver, FakePlayerFactory
+
+        bot = HarpiBot(
+            resolver=FakeResolver(), player_factory=FakePlayerFactory(), prefix="-"
+        )
+        channel = _FakeVoiceChannel("Test Room")
+        guild = _FakeGuild()
+        msg = _FakeDiscordMessage(
+            content="-play https://youtu.be/abc",
+            guild=guild,
+            voice=_FakeVoiceState(channel),
+        )
+
+        response = await bot.handle_discord_message(msg)
+
+        assert response is not None
+        assert "Adicionado" in _as_str(response)
+
+    @pytest.mark.asyncio
+    async def test_voice_connection_different_channel_moves(self):
+        from test.unit.conftest import FakeResolver, FakePlayerFactory
+
+        bot = HarpiBot(
+            resolver=FakeResolver(), player_factory=FakePlayerFactory(), prefix="-"
+        )
+        channel1 = _FakeVoiceChannel("Room A")
+        channel2 = _FakeVoiceChannel("Room B")
+        guild = _FakeGuild()
+        guild.voice_client = _FakeVoiceClientWithChannel(channel1)
+
+        msg = _FakeDiscordMessage(
+            content="-play https://youtu.be/abc",
+            guild=guild,
+            voice=_FakeVoiceState(channel2),
+        )
+
+        response = await bot.handle_discord_message(msg)
+
+        assert response is not None
+        assert "Adicionado" in _as_str(response)
+
+    @pytest.mark.asyncio
+    async def test_exception_in_dispatch_returns_error(self):
+        from test.unit.conftest import FakeResolver, FakePlayerFactory, FakePlayer
+        from harpi.application.player_service import PlayerService
+
+        resolver = FakeResolver()
+        player = FakePlayer()
+        service = PlayerService(resolver=resolver, player=player)
+        bot = HarpiBot(
+            resolver=resolver, player_factory=FakePlayerFactory(), prefix="-"
+        )
+        guild = _FakeGuild()
+        bot._guild_routers[guild.id] = _FailingRouter(
+            player_service=service, prefix="-"
+        )
+        bot._guild_players[guild.id] = player
+
+        msg = _FakeDiscordMessage(
+            content="-play https://youtu.be/abc",
+            guild=guild,
+            voice=_FakeVoiceState(_FakeVoiceChannel()),
+        )
+
+        response = await bot.handle_discord_message(msg)
+
+        assert response is not None
+        assert "erro" in _as_str(response).lower()
+
+
