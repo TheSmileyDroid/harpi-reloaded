@@ -36,7 +36,12 @@ class TestPlayerServicePlay:
         await svc.play("https://youtu.be/abc")
         await svc.play("https://youtu.be/def")
         assert len(svc.queue.tracks) == 2
-        assert player.playing.source_id == track1.source_id
+        current = svc.queue.get_current_track()
+        assert current is not None
+        assert current.source_id == track1.source_id
+        playing = player.playing
+        assert playing is not None
+        assert playing.source_id == track1.source_id
 
 
 class TestPlayerServicePauseResume:
