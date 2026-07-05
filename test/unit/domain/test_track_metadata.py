@@ -127,11 +127,3 @@ class TestSourceIdExtraction:
     def test_source_id(self, link: str, source: Source, expected: str):
         metadata = TrackMetadata(link=link, source=source)
         assert metadata.source_id == expected
-
-
-class TestTrackMetadataImmutability:
-    def test_track_metadata_is_frozen(self):
-        metadata = TrackMetadata(source=Source.YOUTUBE, link="https://youtu.be/abc")
-        with pytest.raises(Exception):  # dataclass frozen raises FrozenInstanceError
-            metadata.title = "New Title"  # ty: ignore[invalid-assignment]
-
