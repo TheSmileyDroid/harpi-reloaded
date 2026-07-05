@@ -1,4 +1,4 @@
-from test.unit.conftest import FakeResolver
+from test.unit.conftest import FakeResolver, FakeVoiceClient, DeferredAfterVoiceClient
 from typing import Any
 import pytest
 from harpi.application.ports.audio import (
@@ -11,44 +11,6 @@ from harpi.domain.track_metadata import TrackMetadata, Source
 class FakeAudioSource:
     def cleanup(self) -> None:
         pass
-
-
-class FakeVoiceClient:
-    def __init__(self):
-        self._is_playing = False
-        self._is_paused = False
-        self._source = None
-        self._after = None
-        self.play_calls = 0
-
-    def play(self, source, after=None):
-        self._source = source
-        self._after = after
-        self._is_playing = True
-        self._is_paused = False
-        self.play_calls += 1
-
-    def pause(self):
-        self._is_paused = True
-        self._is_playing = False
-
-    def resume(self):
-        self._is_paused = False
-        self._is_playing = True
-
-    def stop(self):
-        self._is_playing = False
-        self._is_paused = False
-        if self._after is not None:
-            after = self._after
-            self._after = None
-            after(None)
-
-    def is_playing(self):
-        return self._is_playing
-
-    def is_paused(self):
-        return self._is_paused
 
 
 @pytest.fixture
@@ -337,10 +299,12 @@ class TestDiscordPlayerLiveVolume:
     async def test_set_background_volume_mid_playback_changes_output(
         self, make_streamed_player, voice_client, track, bg_track
     ):
-        player = make_streamed_player([
-            FakeStreamProcess(3, value=0),
-            FakeStreamProcess(3, value=1000),
-        ])
+        player = make_streamed_player(
+            [
+                FakeStreamProcess(3, value=0),
+                FakeStreamProcess(3, value=1000),
+            ]
+        )
         await player.play(track)
         await player.add_background_source(bg_track)
 
@@ -372,10 +336,12 @@ class TestDiscordPlayerTrackEnd:
     ):
         import asyncio
 
-        player = make_streamed_player([
-            FakeStreamProcess(1, value=1000),
-            FakeStreamProcess(5, value=100),
-        ])
+        player = make_streamed_player(
+            [
+                FakeStreamProcess(1, value=1000),
+                FakeStreamProcess(5, value=100),
+            ]
+        )
         finished = asyncio.Event()
 
         async def on_finish():
@@ -401,11 +367,13 @@ class TestDiscordPlayerTrackEnd:
             duration=90,
             source=Source.YOUTUBE,
         )
-        player = make_streamed_player([
-            FakeStreamProcess(1, value=1000),
-            FakeStreamProcess(9, value=0),
-            FakeStreamProcess(3, value=800),
-        ])
+        player = make_streamed_player(
+            [
+                FakeStreamProcess(1, value=1000),
+                FakeStreamProcess(9, value=0),
+                FakeStreamProcess(3, value=800),
+            ]
+        )
         finished = asyncio.Event()
 
         async def on_finish():
@@ -459,6 +427,91 @@ class TestDiscordPlayerTrackEnd:
         await asyncio.sleep(0.05)
 
         assert calls == []
+
+
+class TestDiscordPlayerStaleCallback:
+    """Tests that stale `_on_finish` callbacks (from a previous playback session)
+    are ignored via the generation counter."""
+
+    async def test_stale_after_callback_is_ignored(self, track):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        vc = DeferredAfterVoiceClient()
+
+        class TestPlayer(DiscordPlayer):
+            async def _build_mixed_source(self, track):
+                return FakeAudioSource()
+
+        player = TestPlayer(voice_client=vc, resolver=FakeResolver())
+        finish_calls: list[int] = []
+
+        async def on_finish():
+            finish_calls.append(1)
+
+        # Play track A (generation becomes 1)
+        await player.play(track, on_finish=on_finish)
+        assert vc.is_playing()
+
+        # Stop: generation becomes 2, after is stored (not fired)
+        await player.stop()
+        assert not vc.is_playing()
+
+        # Play track B (generation becomes 3)
+        track_b = TrackMetadata(
+            link="https://youtu.be/bbb",
+            title="Track B",
+            duration=60,
+            source=Source.YOUTUBE,
+        )
+        await player.play(track_b, on_finish=on_finish)
+
+        # Fire the stale `after` from the stop() call (old generation)
+        vc.fire_stored_after()
+
+        # The stale callback should NOT have triggered on_track_end
+        assert finish_calls == []
+
+    async def test_current_after_callback_schedules(self, track):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+        import asyncio
+
+        vc = DeferredAfterVoiceClient()
+
+        class TestPlayer(DiscordPlayer):
+            async def _build_mixed_source(self, track):
+                return FakeAudioSource()
+
+        player = TestPlayer(voice_client=vc, resolver=FakeResolver())
+        finished = asyncio.Event()
+
+        async def on_finish():
+            finished.set()
+
+        await player.play(track, on_finish=on_finish)
+
+        # Fire the current `after` callback directly (correct generation)
+        after = vc._after
+        assert after is not None
+        after(None)
+        await asyncio.wait_for(finished.wait(), timeout=1)
+
+    async def test_generation_increments_on_stop(self, track):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        vc = DeferredAfterVoiceClient()
+
+        class TestPlayer(DiscordPlayer):
+            async def _build_mixed_source(self, track):
+                return FakeAudioSource()
+
+        player = TestPlayer(voice_client=vc, resolver=FakeResolver())
+        initial_gen = player._play_generation
+
+        await player.play(track)
+        assert player._play_generation == initial_gen + 1
+
+        await player.stop()
+        assert player._play_generation == initial_gen + 2
 
 
 class TestDiscordPlayerBackgroundLooping:

@@ -18,8 +18,12 @@ class TestPlayerServicePlay:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.play("https://youtu.be/abc")
         assert len(svc.queue.tracks) == 1
-        assert svc.queue.get_current_track() == track1
-        assert player.playing == track1
+        current = svc.queue.get_current_track()
+        assert current is not None
+        assert current.source_id == track1.source_id
+        playing = player.playing
+        assert playing is not None
+        assert playing.source_id == track1.source_id
         assert player.on_finish == svc.on_track_end
 
     @pytest.mark.asyncio
@@ -32,7 +36,7 @@ class TestPlayerServicePlay:
         await svc.play("https://youtu.be/abc")
         await svc.play("https://youtu.be/def")
         assert len(svc.queue.tracks) == 2
-        assert player.playing == track1
+        assert player.playing.source_id == track1.source_id
 
 
 class TestPlayerServicePauseResume:
@@ -84,7 +88,9 @@ class TestPlayerServiceSkip:
 
         await svc.skip()
 
-        assert player.playing == track2
+        playing = player.playing
+        assert playing is not None
+        assert playing.source_id == track2.source_id
 
     @pytest.mark.asyncio
     async def test_skip_with_single_track_clears_playing(self):
@@ -168,9 +174,11 @@ class TestPlayerServiceOnTrackEnd:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.play("https://youtu.be/abc")
         await svc.play("https://youtu.be/def")
-        assert player.playing == track1
+        assert player.playing is not None
+        assert player.playing.source_id == track1.source_id
         await svc.on_track_end()
-        assert player.playing == track2
+        assert player.playing is not None
+        assert player.playing.source_id == track2.source_id
         assert player.on_finish == svc.on_track_end
 
     @pytest.mark.asyncio
@@ -189,9 +197,11 @@ class TestPlayerServiceOnTrackEnd:
         svc = PlayerService(resolver=resolver, player=player)
         svc.queue.set_loop_mode(LoopMode.TRACK)
         await svc.play("https://youtu.be/abc")
-        assert player.playing == track1
+        assert player.playing is not None
+        assert player.playing.source_id == track1.source_id
         await svc.on_track_end()
-        assert player.playing == track1
+        assert player.playing is not None
+        assert player.playing.source_id == track1.source_id
 
     @pytest.mark.asyncio
     async def test_on_track_end_empty_queue_does_nothing(self):
@@ -298,7 +308,9 @@ class TestPlayerServiceBackgroundAdd:
         await svc.add_background_track("https://youtu.be/def")
         assert len(svc.queue.background_tracks) == 1
         assert len(svc.queue.tracks) == 1
-        assert player.playing == track1
+        playing = player.playing
+        assert playing is not None
+        assert playing.source_id == track1.source_id
 
     @pytest.mark.asyncio
     async def test_add_background_track_failing_link_raises(self):
@@ -348,7 +360,9 @@ class TestPlayerServiceBackgroundSet:
         assert failed == 0
         assert len(svc.queue.background_tracks) == 2
         assert len(svc.queue.tracks) == 1
-        assert svc.queue.get_current_track() == track1
+        current = svc.queue.get_current_track()
+        assert current is not None
+        assert current.source_id == track1.source_id
 
     @pytest.mark.asyncio
     async def test_set_background_tracks_forwards_resolved_tracks_to_player(self):
@@ -507,7 +521,7 @@ class TestPlayerServiceBackgroundDelegation:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/abc")
         assert len(player.background_tracks) == 1
-        assert player.background_tracks[0] == track1
+        assert player.background_tracks[0].source_id == track1.source_id
 
     @pytest.mark.asyncio
     async def test_remove_background_track_calls_player_remove_source(self):

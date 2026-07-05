@@ -2,7 +2,6 @@ from uuid import UUID
 import pytest
 
 from harpi.domain.track_metadata import TrackMetadata, Source
-from harpi.domain.volume import validate_volume
 
 
 class TestTrackMetadataCreation:
@@ -27,7 +26,7 @@ class TestTrackMetadataCreation:
 
 
 class TestTrackMetadataEquality:
-    def test_equality_same_source_id_and_source(self):
+    def test_instances_with_same_source_id_are_not_equal(self):
         meta1 = TrackMetadata(
             source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
         )
@@ -38,7 +37,7 @@ class TestTrackMetadataEquality:
         meta3 = TrackMetadata(
             source=Source.YOUTUBE, link="https://www.youtube.com/watch?v=wPQEeBAXou0"
         )
-        assert meta1 == meta2 == meta3
+        assert meta1 != meta2 != meta3
 
     def test_equality_different_sources(self):
         meta1 = TrackMetadata(
@@ -136,38 +135,3 @@ class TestTrackMetadataImmutability:
         with pytest.raises(Exception):  # dataclass frozen raises FrozenInstanceError
             metadata.title = "New Title"  # ty: ignore[invalid-assignment]
 
-
-class TestValidateVolumeBVA:
-    @pytest.mark.parametrize(
-        "value",
-        [
-            pytest.param(0.0, id="minimum"),
-            pytest.param(0.001, id="just-above-minimum"),
-            pytest.param(0.5, id="midpoint"),
-            pytest.param(0.999, id="just-below-maximum"),
-            pytest.param(1.0, id="maximum"),
-        ],
-    )
-    def test_valid_volumes_accepted(self, value: float):
-        validate_volume(value)
-
-    @pytest.mark.parametrize(
-        "value",
-        [
-            pytest.param(-0.1, id="below-minimum"),
-            pytest.param(1.1, id="above-maximum"),
-            pytest.param(-1.0, id="far-below-minimum"),
-            pytest.param(2.0, id="far-above-maximum"),
-        ],
-    )
-    def test_invalid_volumes_rejected(self, value: float):
-        with pytest.raises(ValueError, match="must be between"):
-            validate_volume(value)
-
-    def test_custom_name_in_error(self):
-        with pytest.raises(ValueError, match="Duck level"):
-            validate_volume(-0.1, "Duck level")
-
-    def test_default_name_in_error(self):
-        with pytest.raises(ValueError, match="^Volume must be between"):
-            validate_volume(-0.1)

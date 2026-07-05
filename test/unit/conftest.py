@@ -138,3 +138,91 @@ def track3() -> TrackMetadata:
 class FakePlayerFactory(AudioPlayerFactoryProtocol):
     def create_player(self, resolver: AudioResolverProtocol) -> AudioPlayerProtocol:
         return FakePlayer()
+
+
+class FakeVoiceClient:
+    def __init__(self):
+        self._is_playing = False
+        self._is_paused = False
+        self._source = None
+        self._after = None
+        self.play_calls = 0
+
+    def play(self, source, after=None):
+        self._source = source
+        self._after = after
+        self._is_playing = True
+        self._is_paused = False
+        self.play_calls += 1
+
+    def pause(self):
+        self._is_paused = True
+        self._is_playing = False
+
+    def resume(self):
+        self._is_paused = False
+        self._is_playing = True
+
+    def stop(self):
+        self._is_playing = False
+        self._is_paused = False
+        if self._after is not None:
+            after = self._after
+            self._after = None
+            after(None)
+
+    def is_playing(self):
+        return self._is_playing
+
+    def is_paused(self):
+        return self._is_paused
+
+
+class DeferredAfterVoiceClient:
+    """FakeVoiceClient that stores the `after` callback instead of firing it."""
+
+    def __init__(self):
+        self._is_playing = False
+        self._is_paused = False
+        self._source = None
+        self._after = None
+        self.play_calls = 0
+        self._stored_afters: list = []
+
+    def play(self, source, after=None):
+        self._source = source
+        self._after = after
+        self._is_playing = True
+        self._is_paused = False
+        self.play_calls += 1
+
+    def pause(self):
+        self._is_paused = True
+        self._is_playing = False
+
+    def resume(self):
+        self._is_paused = False
+        self._is_playing = True
+
+    def stop(self):
+        self._is_playing = False
+        self._is_paused = False
+        if self._after is not None:
+            self._stored_afters.append(self._after)
+            self._after = None
+
+    def fire_stored_after(self, index: int = -1) -> None:
+        if self._stored_afters:
+            after = self._stored_afters.pop(index)
+            after(None)
+
+    def fire_all_stored_afters(self) -> None:
+        while self._stored_afters:
+            after = self._stored_afters.pop(0)
+            after(None)
+
+    def is_playing(self):
+        return self._is_playing
+
+    def is_paused(self):
+        return self._is_paused

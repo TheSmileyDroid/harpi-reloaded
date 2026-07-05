@@ -256,6 +256,13 @@ class TestBackgroundCommands:
         assert len(svc.queue.background_tracks) == 1
         assert svc.queue.background_tracks[0].link == "https://youtu.be/good"
 
+    async def test_bg_empty_args_returns_error(self, service: PlayerService):
+        from harpi.application.commands.background_set import handle_bg
+
+        result = await handle_bg(service, "")
+        assert isinstance(result, str)
+        assert "Especifique ao menos uma URL ou termo de busca." == result
+
     async def test_bgadd_handler(self, service: PlayerService):
         from harpi.application.commands.background_add import handle_bgadd
 

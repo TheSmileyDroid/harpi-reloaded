@@ -182,3 +182,14 @@ class TestRmCommand:
         result = await handle_rm(service, "-1")
         assert isinstance(result, str)
         assert "inválido" in result
+
+    async def test_rm_removes_only_one_duplicate(self, service: PlayerService):
+        from harpi.application.commands.rm import handle_rm
+
+        await service.play("https://youtu.be/abc")
+        await service.play("https://youtu.be/abc")
+        assert len(service.queue.tracks) == 2
+        result = await handle_rm(service, "0")
+        assert isinstance(result, str)
+        assert "removida" in result
+        assert len(service.queue.tracks) == 1

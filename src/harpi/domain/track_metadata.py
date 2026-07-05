@@ -34,7 +34,7 @@ class TrackMetadata:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, TrackMetadata):
             return NotImplemented
-        return self.source_id == other.source_id and self.source == other.source
+        return self.id == other.id
 
     def __hash__(self) -> int:
         return hash((self.source_id, self.source))

@@ -60,9 +60,17 @@ async def discord_client():
 @pytest.fixture(scope="session")
 async def voice_client(discord_client):
     client, guild_id, channel_id = discord_client
+    if not client.is_ready():
+        pytest.skip("Discord client is not ready")
     guild = client.get_guild(guild_id)
+    if guild is None:
+        pytest.skip(f"Could not find guild with ID {guild_id}")
     channel = guild.get_channel(channel_id)
+    if channel is None:
+        pytest.skip(f"Could not find channel with ID {channel_id} in guild {guild_id}")
     vc = await channel.connect()
+    if vc is None:
+        pytest.skip("Could not connect to voice channel")
     yield vc
     await vc.disconnect()
 

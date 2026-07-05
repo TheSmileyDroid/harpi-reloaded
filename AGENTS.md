@@ -73,6 +73,8 @@ Remove tests that are:
 
 ### Running Tools (always use `uv run`)
 
+Most of the tools are already configured py the pyproject.toml.
+
 | Tool | Command |
 |------|---------|
 | Tests | `uv run pytest test/ -v` |

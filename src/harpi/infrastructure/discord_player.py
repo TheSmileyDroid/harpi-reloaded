@@ -27,14 +27,13 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._paused_position: float | None = None
         self._on_finish_callback: Callable[[], Coroutine[Any, Any, None]] | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._duck_level: float = 0.2
-        self._saved_background_volume: float | None = None
         self.background_tracks: list[TrackMetadata] = []
         self.is_paused: bool = False
         self.volume: float = 1.0
         self.background_volume: float = 0.5
         self._mixed_source: MixedAudioSource | None = None
         self._fg_proc: Any = None
+        self._play_generation: int = 0
 
     @property
     def playing(self) -> TrackMetadata | None:
@@ -64,6 +63,8 @@ class DiscordPlayer(AudioPlayerProtocol):
         on_finish: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
         self._check_connected()
+        self._play_generation += 1
+        gen = self._play_generation
         self._current = track
         self._start_time = time.monotonic()
         self._paused_position = None
@@ -89,7 +90,7 @@ class DiscordPlayer(AudioPlayerProtocol):
                     self._mixed_source = None
                 source = await self._build_mixed_source(track)
                 self._mixed_source = source
-                self._voice_client.play(source, after=lambda e: self._on_finish(e))
+                self._voice_client.play(source, after=lambda e: self._on_finish(e, gen))
         except Exception:
             logger.exception("Failed to create audio source for %s", track.link)
             raise
@@ -115,6 +116,8 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._check_connected()
         logger.info("Stopping playback")
         # Parada manual não é fim de faixa: sem callback de avanço.
+        # Incrementar geração para invalidar callbacks `after` pendentes.
+        self._play_generation += 1
         self._on_finish_callback = None
         self._voice_client.stop()
         if self._mixed_source is not None:
@@ -227,11 +230,19 @@ class DiscordPlayer(AudioPlayerProtocol):
             self._kill_process(proc)
         return removed
 
-    def _on_finish(self, error: Exception | None) -> None:
+    def _on_finish(self, error: Exception | None, generation: int) -> None:
         if error:
             logger.error("Playback finished with error: %s", error)
         else:
             logger.info("Playback finished")
+        # Ignorar callbacks de gerações anteriores (stale after callbacks).
+        if generation != self._play_generation:
+            logger.debug(
+                "Ignoring stale on_finish callback (gen %d != %d)",
+                generation,
+                self._play_generation,
+            )
+            return
         if self._mixed_source is not None:
             self._mixed_source.cleanup()
             self._mixed_source = None
@@ -262,7 +273,6 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     def set_ducking(self, duck_level: float) -> None:
         validate_volume(duck_level, "Duck level")
-        self._duck_level = duck_level
         logger.info("Duck level set to %s", duck_level)
 
     def set_voice_client(self, voice_client: Any) -> None:
