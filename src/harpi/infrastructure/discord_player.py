@@ -31,6 +31,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         self.is_paused: bool = False
         self.volume: float = 1.0
         self.background_volume: float = 0.5
+        self.duck_level: float = 1.0
         self._mixed_source: MixedAudioSource | None = None
         self._fg_proc: Any = None
         self._play_generation: int = 0
@@ -180,6 +181,12 @@ class DiscordPlayer(AudioPlayerProtocol):
         except Exception:
             pass
 
+    def _effective_background_volume(self) -> float:
+        # Enquanto há faixa principal tocando, os fundos abaixam pelo duck_level.
+        if self._current is not None:
+            return self.background_volume * self.duck_level
+        return self.background_volume
+
     async def _build_mixed_source(self, track: TrackMetadata) -> MixedAudioSource:
         fg_proc = await self._spawn_source_process(track)
         self._fg_proc = fg_proc
@@ -188,7 +195,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         for bg in self.background_tracks:
             try:
                 procs.append(await self._spawn_source_process(bg, loop=True))
-                vols.append(self.background_volume)
+                vols.append(self._effective_background_volume())
             except Exception:
                 logger.warning("Failed to resolve background track %s", bg.link)
         return MixedAudioSource(
@@ -203,6 +210,8 @@ class DiscordPlayer(AudioPlayerProtocol):
         self._current = None
         self._start_time = None
         self._paused_position = None
+        # Sem faixa principal, os fundos voltam ao volume cheio (des-ducking).
+        self._apply_background_volume()
         # Com outras fontes ativas o stream não termina, então o `after` do
         # discord.py nunca dispararia: o avanço de fila é agendado daqui.
         # Sem fontes restantes, o `after` assume (via _on_finish).
@@ -218,7 +227,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._mixed_source is not None:
             try:
                 proc = await self._spawn_source_process(track, loop=True)
-                self._mixed_source.add_source(proc, self.background_volume)
+                self._mixed_source.add_source(proc, self._effective_background_volume())
             except Exception:
                 logger.warning("Failed to add background source for %s", track.link)
 
@@ -263,7 +272,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._mixed_source is None or self._fg_proc is None:
             return
         for i in range(1, self._mixed_source.source_count):
-            self._mixed_source.set_volume(i, self.background_volume)
+            self._mixed_source.set_volume(i, self._effective_background_volume())
 
     def set_background_volume(self, volume: float) -> None:
         validate_volume(volume, "Background volume")
@@ -273,6 +282,8 @@ class DiscordPlayer(AudioPlayerProtocol):
 
     def set_ducking(self, duck_level: float) -> None:
         validate_volume(duck_level, "Duck level")
+        self.duck_level = duck_level
+        self._apply_background_volume()
         logger.info("Duck level set to %s", duck_level)
 
     def set_voice_client(self, voice_client: Any) -> None:

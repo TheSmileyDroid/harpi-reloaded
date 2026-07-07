@@ -683,10 +683,71 @@ class TestDiscordPlayerOnFinish:
 class TestDiscordPlayerSetDucking:
     async def test_set_ducking_validates_and_sets(self, player):
         player.set_ducking(0.3)
+        assert player.duck_level == 0.3
 
     async def test_set_ducking_invalid_raises(self, player):
         with pytest.raises(ValueError):
             player.set_ducking(1.5)
+
+
+class TestDiscordPlayerDuckingBehavior:
+    async def test_default_duck_level_keeps_background_at_full_volume(
+        self, make_streamed_player, voice_client, track, bg_track
+    ):
+        player = make_streamed_player(
+            [FakeStreamProcess(3, value=0), FakeStreamProcess(3, value=1000)]
+        )
+        await player.play(track)
+        await player.add_background_source(bg_track)
+
+        # background_volume default 0.5, no ducking -> 1000 * 0.5
+        assert _first_sample(voice_client._source.read()) == 500
+
+    async def test_ducking_lowers_background_while_foreground_plays(
+        self, make_streamed_player, voice_client, track, bg_track
+    ):
+        player = make_streamed_player(
+            [FakeStreamProcess(3, value=0), FakeStreamProcess(3, value=1000)]
+        )
+        await player.play(track)
+        await player.add_background_source(bg_track)
+
+        player.set_ducking(0.5)
+
+        # 1000 * background_volume(0.5) * duck(0.5) = 250
+        assert _first_sample(voice_client._source.read()) == 250
+
+    async def test_ducking_multiplies_with_background_volume(
+        self, make_streamed_player, voice_client, track, bg_track
+    ):
+        player = make_streamed_player(
+            [FakeStreamProcess(3, value=0), FakeStreamProcess(3, value=1000)]
+        )
+        await player.play(track)
+        await player.add_background_source(bg_track)
+
+        player.set_background_volume(0.4)
+        player.set_ducking(0.5)
+
+        # 1000 * bg_volume(0.4) * duck(0.5) = 200
+        assert _first_sample(voice_client._source.read()) == 200
+
+    async def test_background_returns_to_full_when_foreground_ends(
+        self, make_streamed_player, voice_client, track, bg_track
+    ):
+        player = make_streamed_player(
+            [FakeStreamProcess(1, value=0), FakeStreamProcess(5, value=1000)]
+        )
+        await player.play(track)
+        await player.add_background_source(bg_track)
+        player.set_ducking(0.5)
+
+        source = voice_client._source
+        source.read()  # foreground still active -> background ducked
+        source.read()  # foreground stream ends here -> un-duck applied
+
+        # background back to full background_volume(0.5): 1000 * 0.5 = 500
+        assert _first_sample(source.read()) == 500
 
 
 class TestDiscordPlayerFactory:

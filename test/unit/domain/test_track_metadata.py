@@ -26,6 +26,13 @@ class TestTrackMetadataCreation:
 
 
 class TestTrackMetadataEquality:
+    def test_instances_with_same_id_are_equal(self):
+        meta1 = TrackMetadata(
+            source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
+        )
+        meta2 = meta1
+        assert meta1 == meta2
+
     def test_instances_with_same_source_id_are_not_equal(self):
         meta1 = TrackMetadata(
             source=Source.YOUTUBE, link="https://youtu.be/wPQEeBAXou0"
