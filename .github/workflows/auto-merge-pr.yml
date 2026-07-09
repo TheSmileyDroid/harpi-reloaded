@@ -1,0 +1,38 @@
+name: Auto Merge PR When Checks Pass
+
+# Enables GitHub native auto-merge on eligible PRs. Native auto-merge waits for
+# ALL required checks (and any branch-protection requirements) to pass, then
+# squashes and deletes the branch. No hand-rolled polling loop required.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write        # required to merge and delete the head branch
+  pull-requests: write   # required to enable auto-merge on the PR
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  enable-auto-merge:
+    name: Enable auto-merge
+    runs-on: ubuntu-latest
+    # Only same-repo PRs (forks get a read-only token and must not auto-merge),
+    # never drafts, never already-merged/closed PRs.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.state == 'open'
+    steps:
+      - name: Enable auto-merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --auto \
+            --squash \
+            --delete-branch
+          echo "Auto-merge enabled for PR #$PR_NUMBER; it will merge once all checks pass."
