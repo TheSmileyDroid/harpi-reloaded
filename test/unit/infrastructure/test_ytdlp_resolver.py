@@ -342,3 +342,35 @@ class TestResolveStream:
 
         with pytest.raises(NetworkError):
             await r.resolve_stream(track)
+
+
+class TestAuthErrors:
+    """Tests for authentication-related error handling."""
+
+    async def test_sign_in_error_gives_helpful_message(self):
+        from yt_dlp import DownloadError
+
+        yt = FakeYtDlp()
+        yt._extract_info_error = DownloadError(
+            "ERROR: [youtube] abc123: Sign in to confirm you're not a bot."
+        )
+        r = _make_resolver(yt)
+
+        with pytest.raises(InvalidLinkError) as exc:
+            await r.resolve("https://youtu.be/abc")
+
+        msg = str(exc.value)
+        assert "bot check" in msg
+        assert "YT_DLP_COOKIES_FILE" in msg
+
+    async def test_non_auth_download_error_still_raises(self):
+        from yt_dlp import DownloadError
+
+        yt = FakeYtDlp()
+        yt._extract_info_error = DownloadError("HTTP Error 404: Not Found")
+        r = _make_resolver(yt)
+
+        with pytest.raises(InvalidLinkError) as exc:
+            await r.resolve("https://youtu.be/abc")
+
+        assert "bot check" not in str(exc.value)
