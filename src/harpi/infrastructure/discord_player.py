@@ -145,7 +145,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         return subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
 
     def _spawn_pcm_process(
@@ -205,7 +205,14 @@ class DiscordPlayer(AudioPlayerProtocol):
             list(headers.keys()) if headers else "none",
             list(cookies.keys()) if cookies else "none",
         )
-        return self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
+        proc = self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
+        # Start stderr reader thread for debugging
+        import threading
+        def _read_stderr():
+            for line in proc.stderr:
+                logger.warning("FFmpeg stderr: %s", line.decode(errors="replace").strip())
+        threading.Thread(target=_read_stderr, daemon=True).start()
+        return proc
 
     @staticmethod
     def _kill_process(proc: Any) -> None:
