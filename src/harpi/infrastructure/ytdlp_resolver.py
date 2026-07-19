@@ -34,6 +34,7 @@ class YtDlpResolver(AudioResolverProtocol):
         self._factory = ytdlp_factory or yt_dlp.YoutubeDL
         self._cookiefile = cookiefile or os.environ.get("YT_DLP_COOKIES_FILE")
         self._last_stream_headers: dict[str, str] = {}
+        self._last_stream_cookies: dict[str, str] = {}
 
     async def resolve(self, link: str) -> TrackMetadata:
         if not link or not link.strip():
@@ -65,6 +66,7 @@ class YtDlpResolver(AudioResolverProtocol):
         url: object = info.get("url")
         if isinstance(url, str):
             self._last_stream_headers = info.get("http_headers", {})
+            self._last_stream_cookies = self._extract_cookies_for_stream(info)
             return url
 
         # Fallback: find an audio-only format with a real audio codec
@@ -80,6 +82,7 @@ class YtDlpResolver(AudioResolverProtocol):
             # Last format tends to be the highest quality
             selected = audio_only[-1]
             self._last_stream_headers = selected.get("http_headers", {})
+            self._last_stream_cookies = self._extract_cookies_for_stream(info, selected)
             return selected["url"]
 
         # Desperate fallback: first format with a URL
@@ -87,13 +90,39 @@ class YtDlpResolver(AudioResolverProtocol):
             url = f.get("url")
             if isinstance(url, str):
                 self._last_stream_headers = f.get("http_headers", {})
+                self._last_stream_cookies = self._extract_cookies_for_stream(info, f)
                 return url
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")
 
+    def _extract_cookies_for_stream(self, info: dict, fmt: dict | None = None) -> dict[str, str]:
+        """Extract cookies from yt-dlp cookiejar for the stream domain."""
+        cookies = {}
+        if not self._cookiefile:
+            return cookies
+        try:
+            # We need a YoutubeDL instance to access the cookiejar
+            # Re-create one with the same params to get the jar
+            opts = {"quiet": True, "cookiefile": self._cookiefile}
+            ydl = self._factory(params=opts)
+            jar = getattr(ydl, "cookiejar", None)
+            if jar is None:
+                return cookies
+            # Extract cookies for googlevideo.com (stream domain)
+            for c in jar:
+                if c.domain and "googlevideo.com" in c.domain:
+                    cookies[c.name] = c.value
+        except Exception:
+            pass
+        return cookies
+
     def get_last_stream_headers(self) -> dict[str, str]:
         """Return HTTP headers needed for the last resolved stream URL."""
         return self._last_stream_headers.copy()
+
+    def get_last_stream_cookies(self) -> dict[str, str]:
+        """Return cookies needed for the last resolved stream URL."""
+        return self._last_stream_cookies.copy()
 
     async def _extract_info(self, url: str, metadata_only: bool = False) -> dict:
         opts: dict = {
