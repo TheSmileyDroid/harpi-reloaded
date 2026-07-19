@@ -357,10 +357,12 @@ class TestPlayerServiceBackgroundSet:
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/old")
         await svc.play("https://youtu.be/abc")
-        succeeded, failed = await svc.set_background_tracks([
-            "https://youtu.be/x",
-            "https://youtu.be/y",
-        ])
+        succeeded, failed = await svc.set_background_tracks(
+            [
+                "https://youtu.be/x",
+                "https://youtu.be/y",
+            ]
+        )
         assert succeeded == 2
         assert failed == 0
         assert len(svc.queue.background_tracks) == 2
@@ -389,10 +391,12 @@ class TestPlayerServiceBackgroundSet:
         svc = PlayerService(resolver=resolver, player=player)
         resolver.set_failure("https://youtu.be/bad", InvalidLinkError("Bad link"))
         await svc.add_background_track("https://youtu.be/old")
-        succeeded, failed = await svc.set_background_tracks([
-            "https://youtu.be/bad",
-            "https://youtu.be/good",
-        ])
+        succeeded, failed = await svc.set_background_tracks(
+            [
+                "https://youtu.be/bad",
+                "https://youtu.be/good",
+            ]
+        )
         assert succeeded == 1
         assert failed == 1
         assert len(svc.queue.background_tracks) == 1
@@ -405,10 +409,12 @@ class TestPlayerServiceBackgroundSet:
         await svc.add_background_track("https://youtu.be/original")
         resolver.set_failure("https://youtu.be/bad1", InvalidLinkError("Bad"))
         resolver.set_failure("https://youtu.be/bad2", InvalidLinkError("Bad"))
-        succeeded, failed = await svc.set_background_tracks([
-            "https://youtu.be/bad1",
-            "https://youtu.be/bad2",
-        ])
+        succeeded, failed = await svc.set_background_tracks(
+            [
+                "https://youtu.be/bad1",
+                "https://youtu.be/bad2",
+            ]
+        )
         assert succeeded == 0
         assert failed == 2
         assert len(svc.queue.background_tracks) == 1
@@ -543,8 +549,10 @@ class TestPlayerServiceBackgroundDelegation:
         player = FakePlayer()
         svc = PlayerService(resolver=resolver, player=player)
         await svc.add_background_track("https://youtu.be/old")
-        await svc.set_background_tracks([
-            "https://youtu.be/new1",
-            "https://youtu.be/new2",
-        ])
+        await svc.set_background_tracks(
+            [
+                "https://youtu.be/new1",
+                "https://youtu.be/new2",
+            ]
+        )
         assert len(player.background_tracks) == 2
