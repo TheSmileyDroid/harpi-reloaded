@@ -211,6 +211,7 @@ class DiscordPlayer(AudioPlayerProtocol):
             # Monitor stderr for 403 Forbidden
             import asyncio
             import threading
+            loop = asyncio.get_running_loop()
             queue: asyncio.Queue[str] = asyncio.Queue()
             stop_event = threading.Event()
 
@@ -219,7 +220,7 @@ class DiscordPlayer(AudioPlayerProtocol):
                     decoded = line.decode(errors="replace").strip()
                     logger.warning("FFmpeg stderr: %s", decoded)
                     if "403 Forbidden" in decoded or "HTTP error 403" in decoded:
-                        asyncio.run_coroutine_threadsafe(queue.put("403"), asyncio.get_event_loop())
+                        loop.call_soon_threadsafe(queue.put_nowait, "403")
                     if stop_event.is_set():
                         break
 
