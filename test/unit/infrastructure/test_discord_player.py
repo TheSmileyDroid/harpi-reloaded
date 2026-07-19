@@ -514,6 +514,106 @@ class TestDiscordPlayerStaleCallback:
         assert player._play_generation == initial_gen + 2
 
 
+class TestDiscordPlayerHeaderForwarding:
+    """Tests that stream headers are forwarded from resolver to ffmpeg."""
+
+    def test_spawn_pcm_process_adds_headers_when_provided(self):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        recorded: list[list[str]] = []
+
+        class RecordingPopenPlayer(DiscordPlayer):
+            @staticmethod
+            def _popen(args: list[str], **kwargs) -> Any:
+                recorded.append(args)
+
+        player = RecordingPopenPlayer(resolver=FakeResolver())
+        player._spawn_pcm_process(
+            "http://x",
+            headers={"User-Agent": "test-agent", "Accept": "*/*"},
+        )
+        player._spawn_pcm_process("http://x", headers=None)
+
+        with_headers, without_headers = recorded
+        assert "-headers" in with_headers
+        ua_idx = with_headers.index("-headers")
+        assert with_headers[ua_idx + 1] == "User-Agent: test-agent"
+        acc_idx = with_headers.index("-headers", ua_idx + 1)
+        assert with_headers[acc_idx + 1] == "Accept: */*"
+        assert "-headers" not in without_headers
+
+    async def test_spawn_source_process_forwards_headers(
+        self, voice_client, track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        captured_headers: list[dict | None] = []
+
+        class HeaderResolver(AudioResolverProtocol):
+            async def resolve(self, link: str) -> TrackMetadata:
+                return TrackMetadata(
+                    link=link, title="T", duration=120, source=Source.YOUTUBE
+                )
+
+            async def resolve_stream(self, track: TrackMetadata) -> str:
+                return "http://stream/url"
+
+            def get_last_stream_headers(self) -> dict[str, str]:
+                return {"User-Agent": "test-agent"}
+
+        class CapturingPlayer(DiscordPlayer):
+            def _spawn_pcm_process(
+                self,
+                url: str,
+                loop: bool = False,
+                headers: dict | None = None,
+                cookies: dict | None = None,
+            ) -> Any:
+                captured_headers.append(headers)
+                return FakeStreamProcess(3, value=0)
+
+        player = CapturingPlayer(
+            voice_client=voice_client, resolver=HeaderResolver()
+        )
+        await player.play(track)
+
+        assert captured_headers == [{"User-Agent": "test-agent"}]
+
+    async def test_spawn_source_process_without_headers(
+        self, voice_client, track
+    ):
+        from harpi.infrastructure.discord_player import DiscordPlayer
+
+        captured_headers: list[dict | None] = []
+
+        class NoHeaderResolver(AudioResolverProtocol):
+            async def resolve(self, link: str) -> TrackMetadata:
+                return TrackMetadata(
+                    link=link, title="T", duration=120, source=Source.YOUTUBE
+                )
+
+            async def resolve_stream(self, track: TrackMetadata) -> str:
+                return "http://stream/url"
+
+        class CapturingPlayer(DiscordPlayer):
+            def _spawn_pcm_process(
+                self,
+                url: str,
+                loop: bool = False,
+                headers: dict | None = None,
+                cookies: dict | None = None,
+            ) -> Any:
+                captured_headers.append(headers)
+                return FakeStreamProcess(3, value=0)
+
+        player = CapturingPlayer(
+            voice_client=voice_client, resolver=NoHeaderResolver()
+        )
+        await player.play(track)
+
+        assert captured_headers == [{}]
+
+
 class TestDiscordPlayerBackgroundLooping:
     async def test_background_added_mid_playback_spawns_with_looping(
         self, voice_client, track, bg_track

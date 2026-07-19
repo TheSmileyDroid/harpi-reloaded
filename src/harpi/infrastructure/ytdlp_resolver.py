@@ -30,9 +30,11 @@ class YtDlpResolver(AudioResolverProtocol):
         self,
         ytdlp_factory: Callable | None = None,
         cookiefile: str | None = None,
+        js_runtimes: dict[str, dict] | None = None,
     ):
         self._factory = ytdlp_factory or yt_dlp.YoutubeDL
         self._cookiefile = cookiefile or os.environ.get("YT_DLP_COOKIES_FILE")
+        self._js_runtimes = js_runtimes
         self._last_stream_headers: dict[str, str] = {}
 
     async def resolve(self, link: str) -> TrackMetadata:
@@ -61,11 +63,9 @@ class YtDlpResolver(AudioResolverProtocol):
     async def resolve_stream(self, track: TrackMetadata) -> str:
         info = await self._extract_info(track.link, metadata_only=False)
 
-        # Use top-level URL from yt-dlp (already selected by format option)
         url: object = info.get("url")
         if isinstance(url, str):
             self._last_stream_headers = info.get("http_headers", {})
-            # Cookies are handled via cookiefile in yt-dlp options
             logger.info(
                 "Resolved stream URL: format=%s ext=%s acodec=%s abr=%s",
                 info.get("format_id", "unknown"),
@@ -73,16 +73,14 @@ class YtDlpResolver(AudioResolverProtocol):
                 info.get("acodec", "unknown"),
                 info.get("abr", "unknown"),
             )
-            logger.info(
-                "Stream URL: %s...", url[:80]
-            )
+            logger.info("Stream URL: %s...", url[:80])
             logger.info(
                 "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
             )
             return url
 
-        # Fallback: iterate formats to find a playable audio format
         formats = info.get("formats", [])
+        logger.info("Available formats: %d", len(formats))
         for f in formats:
             if f.get("vcodec") != "none":
                 continue
@@ -105,9 +103,9 @@ class YtDlpResolver(AudioResolverProtocol):
     def get_last_stream_headers(self) -> dict[str, str]:
         """Return HTTP headers needed for the last resolved stream URL."""
         return self._last_stream_headers.copy()
-        """Return cookies needed for the last resolved stream URL."""
-        # Cookies are handled via cookiefile in yt-dlp options
-        return {}
+
+    def get_cookiefile(self) -> str | None:
+        return self._cookiefile
 
     async def _extract_info(self, url: str, metadata_only: bool = False) -> dict:
         opts: dict = {
@@ -121,6 +119,8 @@ class YtDlpResolver(AudioResolverProtocol):
             opts["cookiefile"] = self._cookiefile
         else:
             logger.warning("No cookiefile configured — YouTube may require cookies")
+        if self._js_runtimes:
+            opts["js_runtimes"] = self._js_runtimes
 
         def _sync_extract() -> dict:
             ydl = self._factory(params=opts)

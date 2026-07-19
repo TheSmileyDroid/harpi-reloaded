@@ -14,7 +14,7 @@ class FallbackResolver(AudioResolverProtocol):
     starts failing more frequently than another.
     """
 
-    _MAX_ERRORS = 100  # prevent unbounded growth
+    _MAX_ERRORS = 100
 
     def __init__(self, resolvers: list[AudioResolverProtocol]):
         if not resolvers:
@@ -110,3 +110,15 @@ class FallbackResolver(AudioResolverProtocol):
                 except Exception:
                     pass
         return {}
+
+    def get_cookiefile(self) -> str | None:
+        """Return cookiefile from the first resolver that provides one."""
+        for resolver in self._sorted():
+            if hasattr(resolver, "get_cookiefile"):
+                try:
+                    result = resolver.get_cookiefile()
+                    if result is not None:
+                        return result
+                except Exception:
+                    pass
+        return None
