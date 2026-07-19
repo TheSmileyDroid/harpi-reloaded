@@ -191,11 +191,12 @@ class DiscordPlayer(AudioPlayerProtocol):
     ) -> Any:
         if self._resolver is None:
             raise RuntimeError("No resolver configured for stream resolution")
+
+        # Extract fresh URL right before spawning to avoid expiration
         url = await self._resolver.resolve_stream(track)
         headers = {}
         cookies = {}
         if hasattr(self._resolver, "get_last_stream_headers"):
-            # YtDlpResolver provides stream headers/cookies; other resolvers don't
             resolver: Any = self._resolver
             headers = resolver.get_last_stream_headers()
             if hasattr(self._resolver, "get_last_stream_cookies"):
