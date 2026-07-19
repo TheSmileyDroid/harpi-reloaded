@@ -41,7 +41,7 @@ class YtDlpResolver(AudioResolverProtocol):
         if not self._is_youtube_url(link):
             raise InvalidLinkError(f"Not a YouTube URL: {link}")
 
-        info = await self._extract_info(link)
+        info = await self._extract_info(link, metadata_only=True)
 
         title = info.get("title")
         if title is None:
@@ -58,9 +58,9 @@ class YtDlpResolver(AudioResolverProtocol):
         )
 
     async def resolve_stream(self, track: TrackMetadata) -> str:
-        info = await self._extract_info(track.link)
+        info = await self._extract_info(track.link, metadata_only=False)
 
-        # yt-dlp puts the selected format's direct URL at the top level
+        # Try the selected format's direct URL first
         url: object = info.get("url")
         if isinstance(url, str):
             return url
@@ -86,17 +86,27 @@ class YtDlpResolver(AudioResolverProtocol):
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")
 
-    async def _extract_info(self, url: str) -> dict:
-        opts = {
+    async def _extract_info(self, url: str, metadata_only: bool = False) -> dict:
+        opts: dict = {
             "quiet": True,
-            "format": "bestaudio/best",
             "no_warnings": True,
+            "js_runtimes": {"node": {}},
         }
+        if not metadata_only:
+            # Request best audio for stream URLs; for metadata-only we skip
+            # format selection entirely to avoid failures on videos where
+            # a specific format code is unavailable.
+            opts["format"] = "worstaudio/worst"
         if self._cookiefile:
+            logger.info("Using cookiefile: %s", self._cookiefile)
             opts["cookiefile"] = self._cookiefile
+        else:
+            logger.warning("No cookiefile configured — YouTube may require cookies")
 
         def _sync_extract() -> dict:
             ydl = self._factory(params=opts)
+            if self._cookiefile:
+                self._log_cookie_stats(ydl)
             return ydl.extract_info(url, download=False)
 
         try:
@@ -112,9 +122,11 @@ class YtDlpResolver(AudioResolverProtocol):
             msg = str(e)
             if "Sign in to confirm" in msg:
                 raise InvalidLinkError(
-                    "YouTube requires authentication (bot check). "
-                    "Export a cookies.txt file from your browser and set the "
-                    "YT_DLP_COOKIES_FILE environment variable to its path. "
+                    "YouTube bot check triggered from this IP. "
+                    "A cookies.txt file was provided but may lack required auth cookies. "
+                    "Export fresh cookies from a logged-in browser using: "
+                    "yt-dlp --cookies-from-browser chrome --cookies cookies.txt\n"
+                    "Then copy the file to the server and set YT_DLP_COOKIES_FILE.\n"
                     "See: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
                 ) from e
             raise InvalidLinkError(msg) from e
@@ -124,6 +136,38 @@ class YtDlpResolver(AudioResolverProtocol):
             raise NetworkError(str(e)) from e
 
         return info
+
+    @staticmethod
+    def _log_cookie_stats(ydl: yt_dlp.YoutubeDL) -> None:
+        """Log how many cookies were loaded for youtube.com."""
+        try:
+            from unittest.mock import ANY
+            _ = ANY
+        except ImportError:
+            pass
+        try:
+            jar = getattr(ydl, "cookiejar", None)
+            if jar is not None:
+                yt_cookies = [
+                    c for c in jar if c.domain and "youtube.com" in c.domain
+                ]
+                names = sorted(c.name for c in yt_cookies)
+                logger.info(
+                    "Loaded %d YouTube cookies: %s",
+                    len(yt_cookies),
+                    ", ".join(names) if names else "none",
+                )
+                required = {"LOGIN_INFO", "SAPISID", "__Secure-3PAPISID"}
+                missing = required - set(names)
+                if missing:
+                    logger.warning(
+                        "Missing auth cookies: %s. "
+                        "y-dlp may still be blocked. "
+                        "Re-export cookies from a logged-in browser session.",
+                        ", ".join(sorted(missing)),
+                    )
+        except Exception:
+            pass
 
     @staticmethod
     def _is_youtube_url(link: str) -> bool:

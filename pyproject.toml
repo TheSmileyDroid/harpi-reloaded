@@ -18,7 +18,7 @@ dependencies = [
     "discord-py>=2.7.1",
     "pynacl>=1.5.0",
     "davey>=0.1.5",
-    "yt-dlp",
+    "yt-dlp[default]",
     "numpy>=2.4.6",
     "vulture>=2.16",
 ]
