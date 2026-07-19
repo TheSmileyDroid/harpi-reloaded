@@ -96,7 +96,7 @@ class YtDlpResolver(AudioResolverProtocol):
             # Request best audio for stream URLs; for metadata-only we skip
             # format selection entirely to avoid failures on videos where
             # a specific format code is unavailable.
-            opts["format"] = "worstaudio/worst"
+            opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
         if self._cookiefile:
             logger.info("Using cookiefile: %s", self._cookiefile)
             opts["cookiefile"] = self._cookiefile
