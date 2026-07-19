@@ -11,6 +11,8 @@ class AudioResolverProtocol(Protocol):
         return {}
     def get_last_stream_cookies(self) -> dict[str, str]:
         return {}
+    def get_cookiefile(self) -> str | None:
+        return None
 
 
 class AudioPlayerProtocol(Protocol):

@@ -24,7 +24,7 @@ BOT_COLOR = 0x57F287
 async def main():
     load_dotenv()
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
 
     token = os.environ.get("DISCORD_TOKEN")
@@ -37,8 +37,8 @@ async def main():
 
     cookiefile = os.environ.get("YT_DLP_COOKIES_FILE")
     resolver = FallbackResolver([
+        YtDlpResolver(cookiefile=cookiefile, js_runtimes={"node": {}}),
         YoutubeResolver(),
-        YtDlpResolver(cookiefile=cookiefile),
     ])
     player_factory = DiscordPlayerFactory()
     bot = HarpiBot(resolver=resolver, prefix=prefix, player_factory=player_factory)

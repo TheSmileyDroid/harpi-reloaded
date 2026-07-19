@@ -40,6 +40,11 @@ class FakeResolver:
     def get_last_stream_cookies(self) -> dict[str, str]:
         return {}
 
+    def get_cookiefile(self) -> str | None:
+        return None
+
+
+
 
 class TestFallbackResolverInit:
     def test_empty_resolvers_raises(self):

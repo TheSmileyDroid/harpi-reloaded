@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shutil
 import subprocess
 import time
 from collections.abc import Callable, Coroutine
@@ -79,8 +80,6 @@ class DiscordPlayer(AudioPlayerProtocol):
                 and self._fg_proc is not None
                 and self._voice_client.is_playing()
             ):
-                # O mixer segue vivo tocando os fundos: troca só o slot 0
-                # (faixa principal) em vez de recriar tudo.
                 new_proc = await self._spawn_source_process(track)
                 old = self._mixed_source.replace_source(0, new_proc, self.volume)
                 self._fg_proc = new_proc
@@ -116,8 +115,6 @@ class DiscordPlayer(AudioPlayerProtocol):
     async def stop(self) -> None:
         self._check_connected()
         logger.info("Stopping playback")
-        # Parada manual não é fim de faixa: sem callback de avanço.
-        # Incrementar geração para invalidar callbacks `after` pendentes.
         self._play_generation += 1
         self._on_finish_callback = None
         self._voice_client.stop()
@@ -145,7 +142,7 @@ class DiscordPlayer(AudioPlayerProtocol):
         return subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
 
     def _spawn_pcm_process(
@@ -153,17 +150,13 @@ class DiscordPlayer(AudioPlayerProtocol):
         url: str,
         loop: bool = False,
         headers: dict | None = None,
-        cookies: dict | None = None,
     ) -> Any:
         args = ["ffmpeg"]
         if loop:
             args += ["-stream_loop", "-1"]
         if headers:
-            header_lines = [f"{k}: {v}" for k, v in headers.items()]
-            args += ["-headers", "\r\n".join(header_lines) + "\r\n"]
-        if cookies:
-            cookie_lines = [f"{k}={v}" for k, v in cookies.items()]
-            args += ["-cookies", "; ".join(cookie_lines)]
+            for key, value in headers.items():
+                args += ["-headers", f"{key}: {value}"]
         args += [
             "-reconnect",
             "1",
@@ -179,10 +172,8 @@ class DiscordPlayer(AudioPlayerProtocol):
             "FFmpeg stream URL: %s...", url[:80] if isinstance(url, str) else "N/A"
         )
         logger.info(
-            "FFmpeg cmd: %s (headers=%d, cookies=%d)",
+            "FFmpeg cmd: %s",
             " ".join(args[:12]) + " ...",
-            len(headers) if headers else 0,
-            len(cookies) if cookies else 0,
         )
         return self._popen(args)
 
@@ -191,28 +182,70 @@ class DiscordPlayer(AudioPlayerProtocol):
     ) -> Any:
         if self._resolver is None:
             raise RuntimeError("No resolver configured for stream resolution")
+
+        cookiefile = self._resolver.get_cookiefile()
+
+        # Use yt-dlp piped pipeline when a cookiefile is available for
+        # foreground tracks — direct CDN URLs return 403 with ffmpeg.
+        if cookiefile and not loop:
+            logger.info("Using yt-dlp piped audio for foreground track")
+            return self._spawn_ytdlp_pipeline(track)
+
+        # Fallback: extract URL + spawn ffmpeg directly (for background loops
+        # or resolvers that don't use cookies).
         url = await self._resolver.resolve_stream(track)
-        headers = {}
-        cookies = {}
-        if hasattr(self._resolver, "get_last_stream_headers"):
-            # YtDlpResolver provides stream headers/cookies; other resolvers don't
-            resolver: Any = self._resolver
-            headers = resolver.get_last_stream_headers()
-            if hasattr(self._resolver, "get_last_stream_cookies"):
-                cookies = resolver.get_last_stream_cookies()
-        logger.debug(
-            "Spawning FFmpeg for track: headers=%s cookies=%s",
-            list(headers.keys()) if headers else "none",
-            list(cookies.keys()) if cookies else "none",
-        )
-        proc = self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
-        # Start stderr reader thread for debugging
-        import threading
-        def _read_stderr():
-            for line in proc.stderr:
-                logger.warning("FFmpeg stderr: %s", line.decode(errors="replace").strip())
-        threading.Thread(target=_read_stderr, daemon=True).start()
+        headers = self._resolver.get_last_stream_headers()
+        logger.debug("Spawning FFmpeg for track: %s", url[:80])
+        if headers:
+            logger.debug("Using headers: %s", list(headers.keys()))
+        proc = self._spawn_pcm_process(url, loop=loop, headers=headers)
         return proc
+
+    def _spawn_ytdlp_pipeline(self, track: TrackMetadata) -> subprocess.Popen:
+        """Spawn yt-dlp piped to ffmpeg, returning the ffmpeg process.
+
+        yt-dlp handles HTTP/2, cookies, and n-challenge natively, then streams
+        audio to ffmpeg via stdin. When ffmpeg is killed, yt-dlp dies from
+        SIGPIPE on the next write — no separate lifecycle management needed.
+        """
+        cookiefile = self._resolver.get_cookiefile()
+        assert cookiefile
+
+        ytdlp_path = shutil.which("yt-dlp") or "yt-dlp"
+        ytdlp_proc = subprocess.Popen(
+            [
+                ytdlp_path,
+                "--cookies",
+                cookiefile,
+                "--js-runtimes",
+                "node",
+                "-f",
+                "bestaudio/best",
+                "-o",
+                "-",
+                track.link,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+
+        ffmpeg_proc = subprocess.Popen(
+            [
+                shutil.which("ffmpeg") or "ffmpeg",
+                # "-f",
+                # "mp4",
+                "-i",
+                "pipe:0",
+                *self._FFMPEG_PCM_ARGS,
+            ],
+            stdin=ytdlp_proc.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+
+        if ytdlp_proc.stdout:
+            ytdlp_proc.stdout.close()
+        return ffmpeg_proc
 
     @staticmethod
     def _kill_process(proc: Any) -> None:

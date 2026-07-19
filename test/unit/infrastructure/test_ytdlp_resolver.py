@@ -230,6 +230,51 @@ class TestResolve:
         assert r._cookiefile == "/tmp/cookies.txt"
 
 
+class TestJsRuntimes:
+    """Tests for js_runtimes parameter handling."""
+
+    async def test_init_stores_js_runtimes(self):
+        r = YtDlpResolver(js_runtimes={"node": {}})
+        assert r._js_runtimes == {"node": {}}
+
+    async def test_init_defaults_to_none(self):
+        r = YtDlpResolver()
+        assert r._js_runtimes is None
+
+    async def test_custom_js_runtimes_passed_to_params(self):
+        recorded: list[dict] = []
+
+        class RecordingFactory:
+            def __call__(self, params: dict | None = None):
+                recorded.append(params or {})
+                return FakeYtDlp(params)
+
+        r = YtDlpResolver(ytdlp_factory=RecordingFactory(), js_runtimes={"bun": {}})
+        await r.resolve("https://youtu.be/abc")
+
+        assert len(recorded) == 1
+        assert recorded[0].get("js_runtimes") == {"bun": {}}
+
+    async def test_multiple_js_runtimes_passed(self):
+        recorded: list[dict] = []
+
+        class RecordingFactory:
+            def __call__(self, params: dict | None = None):
+                recorded.append(params or {})
+                return FakeYtDlp(params)
+
+        r = YtDlpResolver(
+            ytdlp_factory=RecordingFactory(),
+            js_runtimes={"node": {}, "bun": {}},
+        )
+        await r.resolve("https://youtu.be/abc")
+
+        assert recorded[0].get("js_runtimes") == {"node": {}, "bun": {}}
+
+
+
+
+
 class TestResolveStream:
     async def test_success_via_top_level_url(self):
         """Uses the top-level url field (the main yt-dlp path)."""

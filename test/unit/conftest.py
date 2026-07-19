@@ -36,6 +36,9 @@ class FakeResolver(AudioResolverProtocol):
     def get_last_stream_cookies(self) -> dict[str, str]:
         return {}
 
+    def get_cookiefile(self) -> str | None:
+        return None
+
     def set_failure(self, link: str, exc: Exception) -> None:
         self._failures[link] = exc
 
