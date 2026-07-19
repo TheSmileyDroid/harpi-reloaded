@@ -67,6 +67,17 @@ class YtDlpResolver(AudioResolverProtocol):
         if isinstance(url, str):
             self._last_stream_headers = info.get("http_headers", {})
             self._last_stream_cookies = self._extract_cookies_for_stream(info)
+            logger.info(
+                "Resolved stream URL: format=%s ext=%s acodec=%s abr=%s",
+                info.get("format_id", "unknown"),
+                info.get("ext", "unknown"),
+                info.get("acodec", "unknown"),
+                info.get("abr", "unknown"),
+            )
+            if self._last_stream_headers:
+                logger.debug("Stream HTTP headers: %s", list(self._last_stream_headers.keys()))
+            if self._last_stream_cookies:
+                logger.debug("Stream cookies: %s", list(self._last_stream_cookies.keys()))
             return url
 
         # Fallback: find an audio-only format with a real audio codec
@@ -83,6 +94,17 @@ class YtDlpResolver(AudioResolverProtocol):
             selected = audio_only[-1]
             self._last_stream_headers = selected.get("http_headers", {})
             self._last_stream_cookies = self._extract_cookies_for_stream(info, selected)
+            logger.info(
+                "Resolved stream URL (fallback): format=%s ext=%s acodec=%s abr=%s",
+                selected.get("format_id", "unknown"),
+                selected.get("ext", "unknown"),
+                selected.get("acodec", "unknown"),
+                selected.get("abr", "unknown"),
+            )
+            if self._last_stream_headers:
+                logger.debug("Stream HTTP headers: %s", list(self._last_stream_headers.keys()))
+            if self._last_stream_cookies:
+                logger.debug("Stream cookies: %s", list(self._last_stream_cookies.keys()))
             return selected["url"]
 
         # Desperate fallback: first format with a URL
@@ -91,6 +113,11 @@ class YtDlpResolver(AudioResolverProtocol):
             if isinstance(url, str):
                 self._last_stream_headers = f.get("http_headers", {})
                 self._last_stream_cookies = self._extract_cookies_for_stream(info, f)
+                logger.warning(
+                    "Resolved stream URL (desperate fallback): format=%s ext=%s",
+                    f.get("format_id", "unknown"),
+                    f.get("ext", "unknown"),
+                )
                 return url
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")

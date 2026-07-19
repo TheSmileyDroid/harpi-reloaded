@@ -186,6 +186,11 @@ class DiscordPlayer(AudioPlayerProtocol):
             headers = getattr(self._resolver, "get_last_stream_headers")()
             if hasattr(self._resolver, "get_last_stream_cookies"):
                 cookies = self._resolver.get_last_stream_cookies()
+        logger.debug(
+            "Spawning FFmpeg for track: headers=%s cookies=%s",
+            list(headers.keys()) if headers else "none",
+            list(cookies.keys()) if cookies else "none",
+        )
         return self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
 
     @staticmethod
