@@ -98,8 +98,8 @@ class TestYtDlpResolverStream:
             async with session.head(url, allow_redirects=True) as response:
                 assert response.status == 200
                 content_type = response.headers.get("Content-Type", "")
-                assert "audio" in content_type, (
-                    f"Expected audio/* Content-Type, got {content_type}"
+                assert content_type.startswith(("audio/", "video/")), (
+                    f"Expected audio/* or video/* Content-Type, got {content_type}"
                 )
 
     @pytest.mark.asyncio

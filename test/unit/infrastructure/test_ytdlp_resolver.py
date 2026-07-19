@@ -342,3 +342,90 @@ class TestResolveStream:
 
         with pytest.raises(NetworkError):
             await r.resolve_stream(track)
+
+
+class TestAuthHandling:
+    """Tests for bot detection and authentication handling."""
+
+    async def test_sign_in_error_gives_helpful_message(self):
+        from yt_dlp import DownloadError
+
+        # Create a factory that always produces fakes with the error set
+        class AlwaysFailingFactory:
+            def __call__(self, params: dict | None = None):
+                yt = FakeYtDlp(params)
+                yt._extract_info_error = DownloadError(
+                    "ERROR: [youtube] abc123: Sign in to confirm you're not a bot."
+                )
+                return yt
+
+        r = YtDlpResolver(ytdlp_factory=AlwaysFailingFactory())
+
+        with pytest.raises(InvalidLinkError) as exc:
+            await r.resolve("https://youtu.be/abc")
+
+        msg = str(exc.value)
+        assert "bot check" in msg
+        assert "YT_DLP_COOKIES_FILE" in msg
+
+    async def test_extractor_args_are_set_in_opts(self):
+        """The default opts should include android client extractor_args."""
+        captured_params: list[dict] = []
+
+        class CapturingFactory:
+            def __call__(self, params: dict | None = None):
+                captured_params.append(params or {})
+                return FakeYtDlp(params)
+
+        r = YtDlpResolver(ytdlp_factory=CapturingFactory())
+        await r.resolve("https://youtu.be/abc")
+
+        assert len(captured_params) == 1
+        args = captured_params[0].get("extractor_args", {})
+        youtube_args = args.get("youtube", {})
+        clients = youtube_args.get("player_client", [])
+        assert "android" in clients
+
+    async def test_non_auth_download_error_passes_through(self):
+        from yt_dlp import DownloadError
+
+        yt = FakeYtDlp()
+        yt._extract_info_error = DownloadError("HTTP Error 404: Not Found")
+        r = _make_resolver(yt)
+
+        with pytest.raises(InvalidLinkError) as exc:
+            await r.resolve("https://youtu.be/abc")
+
+        assert "bot check" not in str(exc.value)
+
+    async def test_extract_info_with_fallback_retries_on_sign_in(self):
+        """_extract_info_with_fallback should retry with web client
+        when android client gets a bot check."""
+        from yt_dlp import DownloadError
+
+        call_count: int = 0
+
+        class FailingThenWebFactory:
+            def __call__(self, params: dict | None = None):
+                nonlocal call_count
+                call_count += 1
+                yt = FakeYtDlp(params)
+                # First call (android) fails, second (web) succeeds
+                if call_count == 1:
+                    client = (
+                        (params or {})
+                        .get("extractor_args", {})
+                        .get("youtube", {})
+                        .get("player_client", [])
+                    )
+                    if "android" in client:
+                        yt._extract_info_error = DownloadError(
+                            "ERROR: [youtube] abc: Sign in to confirm you're not a bot."
+                        )
+                return yt
+
+        r = YtDlpResolver(ytdlp_factory=FailingThenWebFactory())
+        result = await r.resolve("https://youtu.be/abc")
+
+        assert result.title == "Test Video from yt-dlp"
+        assert call_count == 2

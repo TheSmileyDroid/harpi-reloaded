@@ -216,3 +216,66 @@ class TestFallbackResolverResolveStream:
 
         with pytest.raises(NetworkError, match="Network down"):
             await fb.resolve_stream(track)
+
+
+class TestFallbackErrorLogging:
+    """Tests that all resolver errors are recorded and the last wins."""
+
+    async def test_errors_are_collected_and_reset_on_all_fail_resolve(self):
+        """After all resolvers fail, error counts reset for fairness."""
+        r1 = FakeResolver("a")
+        r2 = FakeResolver("b")
+        r1.set_failure("https://youtu.be/x", InvalidLinkError("Bad1"))
+        r2.set_failure("https://youtu.be/x", NetworkError("Bad2"))
+        fb = FallbackResolver([r1, r2])
+
+        with pytest.raises(Exception):
+            await fb.resolve("https://youtu.be/x")
+
+        # reset clears counts after all fail
+        assert fb._error_counts == {}
+
+    async def test_errors_are_collected_and_reset_on_all_fail_stream(self):
+        r1 = FakeResolver("a")
+        r2 = FakeResolver("b")
+        r1.set_failure("https://youtu.be/x", InvalidLinkError("Bad1"))
+        r2.set_failure("https://youtu.be/x", NetworkError("Bad2"))
+        fb = FallbackResolver([r1, r2])
+        track = TrackMetadata(
+            link="https://youtu.be/x",
+            title="T",
+            duration=10,
+            source=Source.YOUTUBE,
+        )
+
+        with pytest.raises(Exception):
+            await fb.resolve_stream(track)
+
+        assert fb._error_counts == {}
+
+    async def test_resolve_passes_correct_error(self):
+        """When all fail, the last resolver's error should be raised."""
+        r1 = FakeResolver("a")
+        r2 = FakeResolver("b")
+        r1.set_failure("https://youtu.be/x", InvalidLinkError("First fail"))
+        r2.set_failure("https://youtu.be/x", NetworkError("Last fail"))
+        fb = FallbackResolver([r1, r2])
+
+        with pytest.raises(NetworkError, match="Last fail"):
+            await fb.resolve("https://youtu.be/x")
+
+    async def test_stream_passes_correct_error(self):
+        r1 = FakeResolver("a")
+        r2 = FakeResolver("b")
+        r1.set_failure("https://youtu.be/x", InvalidLinkError("First fail"))
+        r2.set_failure("https://youtu.be/x", NetworkError("Last fail"))
+        fb = FallbackResolver([r1, r2])
+        track = TrackMetadata(
+            link="https://youtu.be/x",
+            title="T",
+            duration=10,
+            source=Source.YOUTUBE,
+        )
+
+        with pytest.raises(NetworkError, match="Last fail"):
+            await fb.resolve_stream(track)
