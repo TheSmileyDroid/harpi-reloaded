@@ -370,5 +370,3 @@ class TestHarpiBotEdgeCases:
 
         assert response is not None
         assert "erro" in _as_str(response).lower()
-
-

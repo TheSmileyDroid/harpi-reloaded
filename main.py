@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 from harpi.application.commands import EmbedData
 from harpi.infrastructure.discord_bot import HarpiBot
+from harpi.infrastructure.fallback_resolver import FallbackResolver
+from harpi.infrastructure.ytdlp_resolver import YtDlpResolver
 from harpi.infrastructure.youtube_resolver import YoutubeResolver
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,11 @@ async def main():
     prefix = os.environ.get("BOT_PREFIX", "-")
     logger.info("Starting Harpi bot with prefix %r", prefix)
 
-    resolver = YoutubeResolver()
+    cookiefile = os.environ.get("YT_DLP_COOKIES_FILE")
+    resolver = FallbackResolver([
+        YoutubeResolver(),
+        YtDlpResolver(cookiefile=cookiefile),
+    ])
     player_factory = DiscordPlayerFactory()
     bot = HarpiBot(resolver=resolver, prefix=prefix, player_factory=player_factory)
 

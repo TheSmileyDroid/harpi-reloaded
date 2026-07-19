@@ -59,7 +59,9 @@ class FakeAsyncYouTube:
     async def streams(self) -> FakeStreams:
         if self._streams_error:
             raise self._streams_error
-        return self._streams or FakeStreams(FakeStream("http://stream.example.com/audio"))
+        return self._streams or FakeStreams(
+            FakeStream("http://stream.example.com/audio")
+        )
 
 
 class FakeAsyncYouTubeFactory:
