@@ -148,7 +148,13 @@ class DiscordPlayer(AudioPlayerProtocol):
             stderr=subprocess.DEVNULL,
         )
 
-    def _spawn_pcm_process(self, url: str, loop: bool = False, headers: dict | None = None) -> Any:
+    def _spawn_pcm_process(
+        self,
+        url: str,
+        loop: bool = False,
+        headers: dict | None = None,
+        cookies: dict | None = None,
+    ) -> Any:
         args = ["ffmpeg"]
         if loop:
             args += ["-stream_loop", "-1"]
@@ -156,6 +162,10 @@ class DiscordPlayer(AudioPlayerProtocol):
             # Build header string for ffmpeg
             header_lines = [f"{k}: {v}" for k, v in headers.items()]
             args += ["-headers", "\r\n".join(header_lines) + "\r\n"]
+        if cookies:
+            # Build cookie string for ffmpeg
+            cookie_lines = [f"{k}={v}" for k, v in cookies.items()]
+            args += ["-cookies", "; ".join(cookie_lines)]
         args += [
             "-reconnect",
             "1",
@@ -176,10 +186,19 @@ class DiscordPlayer(AudioPlayerProtocol):
             raise RuntimeError("No resolver configured for stream resolution")
         url = await self._resolver.resolve_stream(track)
         headers = {}
+        cookies = {}
         if hasattr(self._resolver, "get_last_stream_headers"):
-            # YtDlpResolver provides stream headers; other resolvers don't
-            headers = getattr(self._resolver, "get_last_stream_headers")()
-        return self._spawn_pcm_process(url, loop=loop, headers=headers)
+            # YtDlpResolver provides stream headers/cookies; other resolvers don't
+            resolver: Any = self._resolver
+            headers = resolver.get_last_stream_headers()
+            if hasattr(self._resolver, "get_last_stream_cookies"):
+                cookies = resolver.get_last_stream_cookies()
+        logger.debug(
+            "Spawning FFmpeg for track: headers=%s cookies=%s",
+            list(headers.keys()) if headers else "none",
+            list(cookies.keys()) if cookies else "none",
+        )
+        return self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
 
     @staticmethod
     def _kill_process(proc: Any) -> None:
