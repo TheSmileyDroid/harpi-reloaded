@@ -34,6 +34,12 @@ class FakeResolver:
     def set_failure(self, link: str, exc: Exception) -> None:
         self._failures[link] = exc
 
+    def get_last_stream_headers(self) -> dict[str, str]:
+        return {}
+
+    def get_last_stream_cookies(self) -> dict[str, str]:
+        return {}
+
 
 class TestFallbackResolverInit:
     def test_empty_resolvers_raises(self):

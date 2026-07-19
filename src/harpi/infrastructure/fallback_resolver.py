@@ -96,7 +96,7 @@ class FallbackResolver(AudioResolverProtocol):
         for resolver in self._sorted():
             if hasattr(resolver, "get_last_stream_headers"):
                 try:
-                    return resolver.get_last_stream_headers()
+                    return resolver.get_last_stream_headers()  # type: ignore[attr-defined]
                 except Exception:
                     pass
         return {}
@@ -106,7 +106,7 @@ class FallbackResolver(AudioResolverProtocol):
         for resolver in self._sorted():
             if hasattr(resolver, "get_last_stream_cookies"):
                 try:
-                    return resolver.get_last_stream_cookies()
+                    return resolver.get_last_stream_cookies()  # type: ignore[attr-defined]
                 except Exception:
                     pass
         return {}
