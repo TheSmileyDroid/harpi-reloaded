@@ -75,9 +75,13 @@ class YtDlpResolver(AudioResolverProtocol):
                 info.get("abr", "unknown"),
             )
             if self._last_stream_headers:
-                logger.debug("Stream HTTP headers: %s", list(self._last_stream_headers.keys()))
+                logger.debug(
+                    "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
+                )
             if self._last_stream_cookies:
-                logger.debug("Stream cookies: %s", list(self._last_stream_cookies.keys()))
+                logger.debug(
+                    "Stream cookies: %s", list(self._last_stream_cookies.keys())
+                )
             return url
 
         # Fallback: find an audio-only format with a real audio codec
@@ -102,9 +106,13 @@ class YtDlpResolver(AudioResolverProtocol):
                 selected.get("abr", "unknown"),
             )
             if self._last_stream_headers:
-                logger.debug("Stream HTTP headers: %s", list(self._last_stream_headers.keys()))
+                logger.debug(
+                    "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
+                )
             if self._last_stream_cookies:
-                logger.debug("Stream cookies: %s", list(self._last_stream_cookies.keys()))
+                logger.debug(
+                    "Stream cookies: %s", list(self._last_stream_cookies.keys())
+                )
             return selected["url"]
 
         # Desperate fallback: first format with a URL
@@ -207,15 +215,14 @@ class YtDlpResolver(AudioResolverProtocol):
         """Log how many cookies were loaded for youtube.com."""
         try:
             from unittest.mock import ANY
+
             _ = ANY
         except ImportError:
             pass
         try:
             jar = getattr(ydl, "cookiejar", None)
             if jar is not None:
-                yt_cookies = [
-                    c for c in jar if c.domain and "youtube.com" in c.domain
-                ]
+                yt_cookies = [c for c in jar if c.domain and "youtube.com" in c.domain]
                 names = sorted(c.name for c in yt_cookies)
                 logger.info(
                     "Loaded %d YouTube cookies: %s",

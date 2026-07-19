@@ -148,7 +148,13 @@ class DiscordPlayer(AudioPlayerProtocol):
             stderr=subprocess.DEVNULL,
         )
 
-    def _spawn_pcm_process(self, url: str, loop: bool = False, headers: dict | None = None, cookies: dict | None = None) -> Any:
+    def _spawn_pcm_process(
+        self,
+        url: str,
+        loop: bool = False,
+        headers: dict | None = None,
+        cookies: dict | None = None,
+    ) -> Any:
         args = ["ffmpeg"]
         if loop:
             args += ["-stream_loop", "-1"]
@@ -183,9 +189,10 @@ class DiscordPlayer(AudioPlayerProtocol):
         cookies = {}
         if hasattr(self._resolver, "get_last_stream_headers"):
             # YtDlpResolver provides stream headers/cookies; other resolvers don't
-            headers = getattr(self._resolver, "get_last_stream_headers")()
+            resolver: Any = self._resolver
+            headers = resolver.get_last_stream_headers()
             if hasattr(self._resolver, "get_last_stream_cookies"):
-                cookies = self._resolver.get_last_stream_cookies()
+                cookies = resolver.get_last_stream_cookies()
         logger.debug(
             "Spawning FFmpeg for track: headers=%s cookies=%s",
             list(headers.keys()) if headers else "none",
