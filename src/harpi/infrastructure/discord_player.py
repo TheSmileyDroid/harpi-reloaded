@@ -192,28 +192,76 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._resolver is None:
             raise RuntimeError("No resolver configured for stream resolution")
 
-        # Extract fresh URL right before spawning to avoid expiration
-        url = await self._resolver.resolve_stream(track)
-        headers = {}
-        cookies = {}
-        if hasattr(self._resolver, "get_last_stream_headers"):
-            resolver: Any = self._resolver
-            headers = resolver.get_last_stream_headers()
-            if hasattr(self._resolver, "get_last_stream_cookies"):
-                cookies = resolver.get_last_stream_cookies()
-        logger.debug(
-            "Spawning FFmpeg for track: headers=%s cookies=%s",
-            list(headers.keys()) if headers else "none",
-            list(cookies.keys()) if cookies else "none",
-        )
-        proc = self._spawn_pcm_process(url, loop=loop, headers=headers, cookies=cookies)
-        # Start stderr reader thread for debugging
-        import threading
-        def _read_stderr():
-            for line in proc.stderr:
-                logger.warning("FFmpeg stderr: %s", line.decode(errors="replace").strip())
-        threading.Thread(target=_read_stderr, daemon=True).start()
-        return proc
+        # Retry up to 2 times on 403 (fresh URL each time)
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            # Extract fresh URL right before spawning to avoid expiration
+            url = await self._resolver.resolve_stream(track)
+            headers = {}
+            if hasattr(self._resolver, "get_last_stream_headers"):
+                resolver: Any = self._resolver
+                headers = resolver.get_last_stream_headers()
+            logger.debug(
+                "Spawning FFmpeg for track (attempt %d): headers=%s",
+                attempt + 1,
+                list(headers.keys()) if headers else "none",
+            )
+            proc = self._spawn_pcm_process(url, loop=loop, headers=headers, cookies={})
+
+            # Monitor stderr for 403 Forbidden
+            import asyncio
+            import threading
+            queue: asyncio.Queue[str] = asyncio.Queue()
+            stop_event = threading.Event()
+
+            def _read_stderr():
+                for line in proc.stderr:
+                    decoded = line.decode(errors="replace").strip()
+                    logger.warning("FFmpeg stderr: %s", decoded)
+                    if "403 Forbidden" in decoded or "HTTP error 403" in decoded:
+                        asyncio.run_coroutine_threadsafe(queue.put("403"), asyncio.get_event_loop())
+                    if stop_event.is_set():
+                        break
+
+            reader_thread = threading.Thread(target=_read_stderr, daemon=True)
+            reader_thread.start()
+
+            try:
+                # Wait for either process exit or 403 detection
+                done, pending = await asyncio.wait(
+                    [
+                        asyncio.create_task(asyncio.to_thread(proc.wait)),
+                        asyncio.create_task(queue.get()),
+                    ],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                for task in done:
+                    result = task.result()
+                    if result == "403":
+                        logger.warning(
+                            "FFmpeg got 403 Forbidden (attempt %d/%d), retrying with fresh URL...",
+                            attempt + 1,
+                            max_retries + 1,
+                        )
+                        proc.kill()
+                        await asyncio.sleep(1)
+                        stop_event.set()
+                        break
+                    # Process exited normally
+                    stop_event.set()
+                    return proc
+                else:
+                    # No 403 detected, process still running
+                    stop_event.set()
+                    return proc
+
+            except Exception:
+                stop_event.set()
+                proc.kill()
+                raise
+
+        raise RuntimeError("Failed to spawn FFmpeg after retries: 403 Forbidden")
 
     @staticmethod
     def _kill_process(proc: Any) -> None:
