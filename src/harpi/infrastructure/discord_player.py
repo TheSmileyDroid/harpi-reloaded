@@ -159,11 +159,9 @@ class DiscordPlayer(AudioPlayerProtocol):
         if loop:
             args += ["-stream_loop", "-1"]
         if headers:
-            # Build header string for ffmpeg
             header_lines = [f"{k}: {v}" for k, v in headers.items()]
             args += ["-headers", "\r\n".join(header_lines) + "\r\n"]
         if cookies:
-            # Build cookie string for ffmpeg
             cookie_lines = [f"{k}={v}" for k, v in cookies.items()]
             args += ["-cookies", "; ".join(cookie_lines)]
         args += [
@@ -177,6 +175,12 @@ class DiscordPlayer(AudioPlayerProtocol):
             url,
             *self._FFMPEG_PCM_ARGS,
         ]
+        logger.info(
+            "FFmpeg cmd: %s (headers=%d, cookies=%d)",
+            " ".join(args[:10]) + " ...",
+            len(headers) if headers else 0,
+            len(cookies) if cookies else 0,
+        )
         return self._popen(args)
 
     async def _spawn_source_process(
