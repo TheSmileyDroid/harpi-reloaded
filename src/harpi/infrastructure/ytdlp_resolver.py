@@ -109,7 +109,15 @@ class YtDlpResolver(AudioResolverProtocol):
                 f"Resolution timed out after {self.TIMEOUT}s"
             ) from e
         except yt_dlp.DownloadError as e:
-            raise InvalidLinkError(str(e)) from e
+            msg = str(e)
+            if "Sign in to confirm" in msg:
+                raise InvalidLinkError(
+                    "YouTube requires authentication (bot check). "
+                    "Export a cookies.txt file from your browser and set the "
+                    "YT_DLP_COOKIES_FILE environment variable to its path. "
+                    "See: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
+                ) from e
+            raise InvalidLinkError(msg) from e
         except ExtractorError as e:
             raise NetworkError(str(e)) from e
         except Exception as e:

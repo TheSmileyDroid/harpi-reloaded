@@ -44,7 +44,7 @@ class FallbackResolver(AudioResolverProtocol):
 
     async def resolve(self, link: str) -> TrackMetadata:
         ordered = self._sorted()
-        last_error: Exception | None = None
+        errors: list[tuple[str, Exception]] = []
 
         for resolver in ordered:
             try:
@@ -58,15 +58,17 @@ class FallbackResolver(AudioResolverProtocol):
                     e,
                 )
                 self._record_error(resolver)
-                last_error = e
+                errors.append((resolver.__class__.__name__, e))
 
         self._reset_if_all_failed()
-        assert last_error is not None
-        raise last_error
+        for name, err in errors:
+            logger.warning("Resolver %s failed for %s: %s", name, link, err)
+        assert errors, "unreachable: resolvers is non-empty"
+        raise errors[-1][1]
 
     async def resolve_stream(self, track: TrackMetadata) -> str:
         ordered = self._sorted()
-        last_error: Exception | None = None
+        errors: list[tuple[str, Exception]] = []
 
         for resolver in ordered:
             try:
@@ -80,8 +82,10 @@ class FallbackResolver(AudioResolverProtocol):
                     e,
                 )
                 self._record_error(resolver)
-                last_error = e
+                errors.append((resolver.__class__.__name__, e))
 
         self._reset_if_all_failed()
-        assert last_error is not None
-        raise last_error
+        for name, err in errors:
+            logger.warning("Resolver %s failed for %s: %s", name, track.link, err)
+        assert errors, "unreachable: resolvers is non-empty"
+        raise errors[-1][1]
