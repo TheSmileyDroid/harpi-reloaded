@@ -591,7 +591,7 @@ class TestDiscordPlayerUsesResolver:
         captured: list[str] = []
 
         class CapturingPlayer(DiscordPlayer):
-            def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+            def _spawn_pcm_process(self, url: str, loop: bool = False, headers: dict | None = None) -> Any:
                 captured.append(url)
                 return FakeStreamProcess(3, value=0)
 
@@ -615,7 +615,7 @@ class TestDiscordPlayerUsesResolver:
         captured: list[str] = []
 
         class CapturingPlayer(DiscordPlayer):
-            def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+            def _spawn_pcm_process(self, url: str, loop: bool = False, headers: dict | None = None) -> Any:
                 captured.append(url)
                 return FakeStreamProcess(3, value=0)
 
