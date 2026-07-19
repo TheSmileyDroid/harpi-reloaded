@@ -46,7 +46,6 @@ jobs:
   integration-e2e:
     name: Integration + E2E Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +59,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Integration tests
+        if: github.event_name == 'workflow_dispatch'
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
@@ -67,6 +67,7 @@ jobs:
         run: uv run pytest test/integration/ -v -m integration
 
       - name: E2E tests
+        if: github.event_name == 'workflow_dispatch'
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
