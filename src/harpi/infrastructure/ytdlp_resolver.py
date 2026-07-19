@@ -33,6 +33,7 @@ class YtDlpResolver(AudioResolverProtocol):
     ):
         self._factory = ytdlp_factory or yt_dlp.YoutubeDL
         self._cookiefile = cookiefile or os.environ.get("YT_DLP_COOKIES_FILE")
+        self._last_stream_headers: dict[str, str] = {}
 
     async def resolve(self, link: str) -> TrackMetadata:
         if not link or not link.strip():
@@ -63,6 +64,7 @@ class YtDlpResolver(AudioResolverProtocol):
         # Try the selected format's direct URL first
         url: object = info.get("url")
         if isinstance(url, str):
+            self._last_stream_headers = info.get("http_headers", {})
             return url
 
         # Fallback: find an audio-only format with a real audio codec
@@ -76,15 +78,22 @@ class YtDlpResolver(AudioResolverProtocol):
         ]
         if audio_only:
             # Last format tends to be the highest quality
-            return audio_only[-1]["url"]
+            selected = audio_only[-1]
+            self._last_stream_headers = selected.get("http_headers", {})
+            return selected["url"]
 
         # Desperate fallback: first format with a URL
         for f in formats:
             url = f.get("url")
             if isinstance(url, str):
+                self._last_stream_headers = f.get("http_headers", {})
                 return url
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")
+
+    def get_last_stream_headers(self) -> dict[str, str]:
+        """Return HTTP headers needed for the last resolved stream URL."""
+        return self._last_stream_headers.copy()
 
     async def _extract_info(self, url: str, metadata_only: bool = False) -> dict:
         opts: dict = {

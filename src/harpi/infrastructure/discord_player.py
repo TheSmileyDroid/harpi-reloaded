@@ -148,10 +148,14 @@ class DiscordPlayer(AudioPlayerProtocol):
             stderr=subprocess.DEVNULL,
         )
 
-    def _spawn_pcm_process(self, url: str, loop: bool = False) -> Any:
+    def _spawn_pcm_process(self, url: str, loop: bool = False, headers: dict | None = None) -> Any:
         args = ["ffmpeg"]
         if loop:
             args += ["-stream_loop", "-1"]
+        if headers:
+            # Build header string for ffmpeg
+            header_lines = [f"{k}: {v}" for k, v in headers.items()]
+            args += ["-headers", "\r\n".join(header_lines) + "\r\n"]
         args += [
             "-reconnect",
             "1",
@@ -171,7 +175,11 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._resolver is None:
             raise RuntimeError("No resolver configured for stream resolution")
         url = await self._resolver.resolve_stream(track)
-        return self._spawn_pcm_process(url, loop=loop)
+        headers = {}
+        if hasattr(self._resolver, "get_last_stream_headers"):
+            # YtDlpResolver provides stream headers; other resolvers don't
+            headers = getattr(self._resolver, "get_last_stream_headers")()
+        return self._spawn_pcm_process(url, loop=loop, headers=headers)
 
     @staticmethod
     def _kill_process(proc: Any) -> None:
