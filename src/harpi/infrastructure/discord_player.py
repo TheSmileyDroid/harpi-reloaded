@@ -176,8 +176,11 @@ class DiscordPlayer(AudioPlayerProtocol):
             *self._FFMPEG_PCM_ARGS,
         ]
         logger.info(
+            "FFmpeg stream URL: %s...", url[:80] if isinstance(url, str) else "N/A"
+        )
+        logger.info(
             "FFmpeg cmd: %s (headers=%d, cookies=%d)",
-            " ".join(args[:10]) + " ...",
+            " ".join(args[:12]) + " ...",
             len(headers) if headers else 0,
             len(cookies) if cookies else 0,
         )
