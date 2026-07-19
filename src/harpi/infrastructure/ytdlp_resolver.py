@@ -93,7 +93,7 @@ class YtDlpResolver(AudioResolverProtocol):
             # Last format tends to be the highest quality
             selected = audio_only[-1]
             self._last_stream_headers = selected.get("http_headers", {})
-            self._last_stream_cookies = self._extract_cookies_for_stream(info, selected)
+            self._last_stream_cookies = self._extract_cookies_for_stream(info)
             logger.info(
                 "Resolved stream URL (fallback): format=%s ext=%s acodec=%s abr=%s",
                 selected.get("format_id", "unknown"),
@@ -112,7 +112,7 @@ class YtDlpResolver(AudioResolverProtocol):
             url = f.get("url")
             if isinstance(url, str):
                 self._last_stream_headers = f.get("http_headers", {})
-                self._last_stream_cookies = self._extract_cookies_for_stream(info, f)
+                self._last_stream_cookies = self._extract_cookies_for_stream(info)
                 logger.warning(
                     "Resolved stream URL (desperate fallback): format=%s ext=%s",
                     f.get("format_id", "unknown"),
@@ -122,7 +122,7 @@ class YtDlpResolver(AudioResolverProtocol):
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")
 
-    def _extract_cookies_for_stream(self, info: dict, fmt: dict | None = None) -> dict[str, str]:
+    def _extract_cookies_for_stream(self, info: dict) -> dict[str, str]:
         """Extract cookies from yt-dlp cookiejar for the stream domain."""
         cookies = {}
         if not self._cookiefile:
