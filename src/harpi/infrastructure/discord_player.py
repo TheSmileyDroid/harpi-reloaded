@@ -158,12 +158,6 @@ class DiscordPlayer(AudioPlayerProtocol):
         args = ["ffmpeg"]
         if loop:
             args += ["-stream_loop", "-1"]
-        if headers:
-            header_lines = [f"{k}: {v}" for k, v in headers.items()]
-            args += ["-headers", "\r\n".join(header_lines) + "\r\n"]
-        if cookies:
-            cookie_lines = [f"{k}={v}" for k, v in cookies.items()]
-            args += ["-cookies", "; ".join(cookie_lines)]
         args += [
             "-reconnect",
             "1",
@@ -179,10 +173,8 @@ class DiscordPlayer(AudioPlayerProtocol):
             "FFmpeg stream URL: %s...", url[:80] if isinstance(url, str) else "N/A"
         )
         logger.info(
-            "FFmpeg cmd: %s (headers=%d, cookies=%d)",
+            "FFmpeg cmd: %s",
             " ".join(args[:12]) + " ...",
-            len(headers) if headers else 0,
-            len(cookies) if cookies else 0,
         )
         return self._popen(args)
 
@@ -192,75 +184,11 @@ class DiscordPlayer(AudioPlayerProtocol):
         if self._resolver is None:
             raise RuntimeError("No resolver configured for stream resolution")
 
-        # Retry up to 2 times on 403 (fresh URL each time)
-        max_retries = 2
-        for attempt in range(max_retries + 1):
-            # Extract fresh URL right before spawning to avoid expiration
-            url = await self._resolver.resolve_stream(track)
-            headers = {}
-            if hasattr(self._resolver, "get_last_stream_headers"):
-                resolver: Any = self._resolver
-                headers = resolver.get_last_stream_headers()
-            logger.debug(
-                "Spawning FFmpeg for track (attempt %d): headers=%s",
-                attempt + 1,
-                list(headers.keys()) if headers else "none",
-            )
-            proc = self._spawn_pcm_process(url, loop=loop, headers=headers, cookies={})
-
-            # Monitor stderr for 403 Forbidden
-            import asyncio
-            import threading
-            loop = asyncio.get_running_loop()
-            queue: asyncio.Queue[str] = asyncio.Queue()
-            stop_event = threading.Event()
-
-            def _read_stderr():
-                for line in proc.stderr:
-                    decoded = line.decode(errors="replace").strip()
-                    logger.warning("FFmpeg stderr: %s", decoded)
-                    if "403 Forbidden" in decoded or "HTTP error 403" in decoded:
-                        loop.call_soon_threadsafe(queue.put_nowait, "403")
-                    if stop_event.is_set():
-                        break
-
-            reader_thread = threading.Thread(target=_read_stderr, daemon=True)
-            reader_thread.start()
-
-            try:
-                # Wait for either process exit or 403 detection
-                done, pending = await asyncio.wait(
-                    [
-                        asyncio.create_task(asyncio.to_thread(proc.wait)),
-                        asyncio.create_task(queue.get()),
-                    ],
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-
-                for task in done:
-                    result = task.result()
-                    if result == "403":
-                        logger.warning(
-                            "FFmpeg got 403 Forbidden (attempt %d/%d), retrying with fresh URL...",
-                            attempt + 1,
-                            max_retries + 1,
-                        )
-                        proc.kill()
-                        await asyncio.sleep(1)
-                        stop_event.set()
-                        break
-                    # Process exited normally
-                    stop_event.set()
-                    return proc
-                else:
-                    # No 403 detected, process still running
-                    stop_event.set()
-                    return proc
-
-            except Exception:
-                stop_event.set()
-                proc.kill()
-                raise
+        # Extract fresh URL right before spawning to avoid expiration
+        url = await self._resolver.resolve_stream(track)
+        logger.debug("Spawning FFmpeg for track: %s", url[:80])
+        proc = self._spawn_pcm_process(url, loop=loop)
+        return proc
 
         raise RuntimeError("Failed to spawn FFmpeg after retries: 403 Forbidden")
 

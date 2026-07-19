@@ -34,7 +34,6 @@ class YtDlpResolver(AudioResolverProtocol):
         self._factory = ytdlp_factory or yt_dlp.YoutubeDL
         self._cookiefile = cookiefile or os.environ.get("YT_DLP_COOKIES_FILE")
         self._last_stream_headers: dict[str, str] = {}
-        self._last_stream_cookies: dict[str, str] = {}
 
     async def resolve(self, link: str) -> TrackMetadata:
         if not link or not link.strip():
@@ -62,11 +61,11 @@ class YtDlpResolver(AudioResolverProtocol):
     async def resolve_stream(self, track: TrackMetadata) -> str:
         info = await self._extract_info(track.link, metadata_only=False)
 
-        # Try the selected format's direct URL first
+        # Use top-level URL from yt-dlp (already selected by format option)
         url: object = info.get("url")
         if isinstance(url, str):
             self._last_stream_headers = info.get("http_headers", {})
-            self._last_stream_cookies = self._extract_cookies_for_stream(info)
+            # Cookies are handled via cookiefile in yt-dlp options
             logger.info(
                 "Resolved stream URL: format=%s ext=%s acodec=%s abr=%s",
                 info.get("format_id", "unknown"),
@@ -75,114 +74,48 @@ class YtDlpResolver(AudioResolverProtocol):
                 info.get("abr", "unknown"),
             )
             logger.info(
-                "Stream URL: %s...", url[:80] if isinstance(url, str) else "N/A"
+                "Stream URL: %s...", url[:80]
             )
             logger.info(
                 "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
             )
-            logger.info(
-                "Stream cookies (googlevideo.com): %s",
-                list(self._last_stream_cookies.keys()) if self._last_stream_cookies else "none",
-            )
             return url
 
-        # Fallback: find an audio-only format with a real audio codec
-        formats = info.get("formats") or []
-        audio_only = [
-            f
-            for f in formats
-            if f.get("vcodec") == "none"
-            and f.get("acodec") not in (None, "none")
-            and isinstance(f.get("url"), str)
-        ]
-        if audio_only:
-            # Last format tends to be the highest quality
-            selected = audio_only[-1]
-            self._last_stream_headers = selected.get("http_headers", {})
-            self._last_stream_cookies = self._extract_cookies_for_stream(info)
-            logger.info(
-                "Resolved stream URL (fallback): format=%s ext=%s acodec=%s abr=%s",
-                selected.get("format_id", "unknown"),
-                selected.get("ext", "unknown"),
-                selected.get("acodec", "unknown"),
-                selected.get("abr", "unknown"),
-            )
-            if self._last_stream_headers:
-                logger.debug(
-                    "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
-                )
-            if self._last_stream_cookies:
-                logger.debug(
-                    "Stream cookies: %s", list(self._last_stream_cookies.keys())
-                )
-            return selected["url"]
-
-        # Desperate fallback: first format with a URL
+        # Fallback: iterate formats to find a playable audio format
+        formats = info.get("formats", [])
         for f in formats:
-            url = f.get("url")
-            if isinstance(url, str):
+            if f.get("vcodec") != "none":
+                continue
+            acodec = f.get("acodec")
+            if acodec is None or acodec == "none":
+                continue
+            fmt_url = f.get("url")
+            if isinstance(fmt_url, str):
                 self._last_stream_headers = f.get("http_headers", {})
-                self._last_stream_cookies = self._extract_cookies_for_stream(info)
-                logger.warning(
-                    "Resolved stream URL (desperate fallback): format=%s ext=%s",
+                logger.info(
+                    "Resolved stream URL (fallback): format=%s ext=%s acodec=%s",
                     f.get("format_id", "unknown"),
                     f.get("ext", "unknown"),
+                    f.get("acodec", "unknown"),
                 )
-                logger.warning(
-                    "Stream URL: %s...", url[:80]
-                )
-                logger.warning(
-                    "Stream HTTP headers: %s", list(self._last_stream_headers.keys())
-                )
-                logger.warning(
-                    "Stream cookies (googlevideo.com): %s",
-                    list(self._last_stream_cookies.keys()) if self._last_stream_cookies else "none",
-                )
-                return url
+                return fmt_url
 
         raise InvalidLinkError(f"No audio stream available for {track.link}")
-
-    def _extract_cookies_for_stream(self, info: dict) -> dict[str, str]:
-        """Extract cookies from yt-dlp cookiejar for the stream domain."""
-        cookies = {}
-        if not self._cookiefile:
-            return cookies
-        try:
-            opts = {"quiet": True, "cookiefile": self._cookiefile}
-            ydl = self._factory(params=opts)
-            jar = getattr(ydl, "cookiejar", None)
-            if jar is None:
-                return cookies
-            for c in jar:
-                if c.domain and ("googlevideo.com" in c.domain or ".google.com" in c.domain):
-                    cookies[c.name] = c.value
-            logger.info(
-                "Extracted %d cookies for stream domain (from %d total)",
-                len(cookies), len(list(jar)),
-            )
-        except Exception as e:
-            logger.warning("Failed to extract stream cookies: %s", e)
-        return cookies
 
     def get_last_stream_headers(self) -> dict[str, str]:
         """Return HTTP headers needed for the last resolved stream URL."""
         return self._last_stream_headers.copy()
-
-    def get_last_stream_cookies(self) -> dict[str, str]:
         """Return cookies needed for the last resolved stream URL."""
-        return self._last_stream_cookies.copy()
+        # Cookies are handled via cookiefile in yt-dlp options
+        return {}
 
     async def _extract_info(self, url: str, metadata_only: bool = False) -> dict:
         opts: dict = {
             "quiet": True,
             "no_warnings": True,
-            "js_runtimes": {"node": {}},
         }
         if not metadata_only:
-            # Request best audio for stream URLs; for metadata-only we skip
-            # format selection entirely to avoid failures on videos where
-            # a specific format code is unavailable.
-            opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
+            opts["format"] = "m4a/bestaudio/best"
         if self._cookiefile:
             logger.info("Using cookiefile: %s", self._cookiefile)
             opts["cookiefile"] = self._cookiefile
