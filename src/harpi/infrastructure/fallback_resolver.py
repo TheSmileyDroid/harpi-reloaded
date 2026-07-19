@@ -89,3 +89,24 @@ class FallbackResolver(AudioResolverProtocol):
             logger.warning("Resolver %s failed for %s: %s", name, track.link, err)
         assert errors, "unreachable: resolvers is non-empty"
         raise errors[-1][1]
+
+    def get_last_stream_headers(self) -> dict[str, str]:
+        """Return HTTP headers for the last resolved stream from the active resolver."""
+        # Try resolvers in priority order until one provides headers
+        for resolver in self._sorted():
+            if hasattr(resolver, "get_last_stream_headers"):
+                try:
+                    return resolver.get_last_stream_headers()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+        return {}
+
+    def get_last_stream_cookies(self) -> dict[str, str]:
+        """Return cookies for the last resolved stream from the active resolver."""
+        for resolver in self._sorted():
+            if hasattr(resolver, "get_last_stream_cookies"):
+                try:
+                    return resolver.get_last_stream_cookies()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+        return {}

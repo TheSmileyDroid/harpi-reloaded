@@ -30,6 +30,12 @@ class FakeResolver(AudioResolverProtocol):
     async def resolve_stream(self, track: TrackMetadata) -> str:
         return f"stream://{track.link}"
 
+    def get_last_stream_headers(self) -> dict[str, str]:
+        return {}
+
+    def get_last_stream_cookies(self) -> dict[str, str]:
+        return {}
+
     def set_failure(self, link: str, exc: Exception) -> None:
         self._failures[link] = exc
 

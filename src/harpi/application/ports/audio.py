@@ -7,6 +7,10 @@ from harpi.domain.track_metadata import TrackMetadata
 class AudioResolverProtocol(Protocol):
     async def resolve(self, link: str) -> TrackMetadata: ...
     async def resolve_stream(self, track: TrackMetadata) -> str: ...
+    def get_last_stream_headers(self) -> dict[str, str]:
+        return {}
+    def get_last_stream_cookies(self) -> dict[str, str]:
+        return {}
 
 
 class AudioPlayerProtocol(Protocol):
